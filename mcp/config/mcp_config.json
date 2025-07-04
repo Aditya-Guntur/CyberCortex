@@ -1,0 +1,247 @@
+{
+  "coordinator": {
+    "max_concurrent_requests": 20,
+    "request_timeout": 600,
+    "heartbeat_interval": 30,
+    "request_queue_size": 1000,
+    "history_retention": 10000
+  },
+  "server_configs": {
+    "security-tools": {
+      "enabled": true,
+      "auto_start": true,
+      "config_file": "mcp/config/security_tools_config.json",
+      "priority": 1,
+      "health_check_url": "http://localhost:9001/health",
+      "restart_on_failure": true,
+      "max_restart_attempts": 3
+    },
+    "vulnerability-db": {
+      "enabled": true,
+      "auto_start": true,
+      "db_path": "data/vulnerability_db.sqlite",
+      "priority": 2,
+      "health_check_url": "http://localhost:9002/health",
+      "restart_on_failure": true,
+      "max_restart_attempts": 3
+    },
+    "compliance-framework": {
+      "enabled": true,
+      "auto_start": true,
+      "db_path": "data/compliance_db.sqlite",
+      "priority": 3,
+      "health_check_url": "http://localhost:9003/health",
+      "restart_on_failure": true,
+      "max_restart_attempts": 3
+    },
+    "threat-intelligence": {
+      "enabled": true,
+      "auto_start": true,
+      "db_path": "data/threat_intelligence.sqlite",
+      "priority": 4,
+      "health_check_url": "http://localhost:9004/health",
+      "restart_on_failure": true,
+      "max_restart_attempts": 3
+    }
+  },
+  "authentication": {
+    "enabled": true,
+    "jwt_secret": "your-jwt-secret-key-change-in-production",
+    "token_expiry": 3600,
+    "require_auth_for_tools": [
+      "nessus_vulnerability_scan",
+      "metasploit_exploit_search",
+      "metasploit_auxiliary_scan",
+      "wireshark_packet_capture",
+      "update_vulnerability_feeds",
+      "assess_framework",
+      "assess_control"
+    ]
+  },
+  "authorization": {
+    "enabled": true,
+    "default_permissions": ["read"],
+    "role_permissions": {
+      "viewer": ["read"],
+      "analyst": ["read", "scan", "assess"],
+      "admin": ["read", "scan", "assess", "configure", "manage"]
+    },
+    "tool_permissions": {
+      "nmap_host_discovery": ["read", "scan"],
+      "nmap_port_scan": ["read", "scan"],
+      "nmap_service_detection": ["read", "scan"],
+      "nessus_vulnerability_scan": ["scan"],
+      "burp_web_scan": ["scan"],
+      "metasploit_exploit_search": ["read"],
+      "metasploit_auxiliary_scan": ["scan"],
+      "wireshark_packet_capture": ["scan"],
+      "wireshark_packet_analysis": ["read"],
+      "search_vulnerabilities": ["read"],
+      "get_vulnerability_details": ["read"],
+      "check_product_vulnerabilities": ["read"],
+      "update_vulnerability_feeds": ["manage"],
+      "vulnerability_statistics": ["read"],
+      "vulnerability_correlation": ["read"],
+      "list_frameworks": ["read"],
+      "get_framework_details": ["read"],
+      "assess_framework": ["assess"],
+      "assess_control": ["assess"],
+      "get_assessment_results": ["read"],
+      "generate_compliance_report": ["read"],
+      "track_compliance_trends": ["read"],
+      "search_indicators": ["read"],
+      "lookup_indicator": ["read"],
+      "correlate_indicators": ["read"],
+      "update_threat_feeds": ["manage"],
+      "threat_statistics": ["read"],
+      "enrich_indicators": ["read"],
+      "generate_threat_report": ["read"]
+    }
+  },
+  "rate_limiting": {
+    "enabled": true,
+    "global_limits": {
+      "requests_per_minute": 100,
+      "requests_per_hour": 1000,
+      "burst_allowance": 20
+    },
+    "user_limits": {
+      "requests_per_minute": 50,
+      "requests_per_hour": 500,
+      "burst_allowance": 10
+    },
+    "tool_specific_limits": {
+      "nessus_vulnerability_scan": {
+        "requests_per_hour": 10,
+        "concurrent_limit": 2
+      },
+      "metasploit_auxiliary_scan": {
+        "requests_per_hour": 20,
+        "concurrent_limit": 3
+      },
+      "wireshark_packet_capture": {
+        "requests_per_hour": 30,
+        "concurrent_limit": 5
+      }
+    }
+  },
+  "security": {
+    "input_validation": {
+      "enabled": true,
+      "max_string_length": 10000,
+      "max_array_length": 1000,
+      "max_object_depth": 10,
+      "sanitize_inputs": true
+    },
+    "output_filtering": {
+      "enabled": true,
+      "filter_sensitive_data": true,
+      "redact_patterns": [
+        "password",
+        "secret",
+        "key",
+        "token",
+        "credential"
+      ]
+    },
+    "execution_sandbox": {
+      "enabled": true,
+      "docker_required": false,
+      "network_isolation": true,
+      "filesystem_isolation": true,
+      "resource_limits": true
+    }
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "prometheus_port": 9000,
+      "collection_interval": 15
+    },
+    "logging": {
+      "level": "INFO",
+      "file": "/var/log/cybercortex/mcp_coordinator.log",
+      "max_size_mb": 100,
+      "backup_count": 10,
+      "structured_logging": true
+    },
+    "health_checks": {
+      "enabled": true,
+      "interval": 30,
+      "timeout": 10,
+      "failure_threshold": 3
+    },
+    "alerting": {
+      "enabled": true,
+      "webhook_url": null,
+      "slack_webhook": null,
+      "email_alerts": false,
+      "alert_on_failures": true,
+      "alert_on_high_load": true
+    }
+  },
+  "performance": {
+    "caching": {
+      "enabled": true,
+      "redis_url": "redis://localhost:6379/1",
+      "default_ttl": 300,
+      "max_cache_size": "100MB"
+    },
+    "connection_pooling": {
+      "enabled": true,
+      "max_connections": 100,
+      "connection_timeout": 30,
+      "idle_timeout": 300
+    },
+    "request_optimization": {
+      "compression": true,
+      "keep_alive": true,
+      "request_batching": true,
+      "parallel_execution": true
+    }
+  },
+  "data_retention": {
+    "request_history": {
+      "max_records": 100000,
+      "retention_days": 90,
+      "cleanup_interval": 86400
+    },
+    "audit_logs": {
+      "retention_days": 365,
+      "compression": true,
+      "archive_location": "/var/archive/cybercortex"
+    },
+    "metrics": {
+      "retention_days": 30,
+      "aggregation_intervals": [300, 3600, 86400]
+    }
+  },
+  "integration": {
+    "external_apis": {
+      "timeout": 30,
+      "retry_attempts": 3,
+      "retry_delay": 5,
+      "circuit_breaker": true
+    },
+    "webhooks": {
+      "enabled": true,
+      "endpoints": [],
+      "authentication": "bearer_token",
+      "retry_policy": {
+        "max_attempts": 3,
+        "backoff_multiplier": 2,
+        "max_delay": 300
+      }
+    },
+    "message_queues": {
+      "enabled": false,
+      "provider": "redis",
+      "connection_string": "redis://localhost:6379/2",
+      "queue_names": {
+        "high_priority": "cybercortex:high",
+        "normal_priority": "cybercortex:normal",
+        "low_priority": "cybercortex:low"
+      }
+    }
+  }
+}

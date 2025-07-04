@@ -1,0 +1,181 @@
+{
+  "tools": {
+    "nmap": {
+      "executable_path": "/usr/bin/nmap",
+      "config_file": null,
+      "environment_vars": {},
+      "docker_image": "instrumentisto/nmap",
+      "timeout": 600,
+      "max_concurrent": 5,
+      "requires_root": false,
+      "network_access": true
+    },
+    "nessus": {
+      "executable_path": "/opt/nessus/bin/nessuscli",
+      "config_file": "/opt/nessus/etc/nessus/nessus.conf",
+      "environment_vars": {},
+      "docker_image": null,
+      "timeout": 3600,
+      "max_concurrent": 2,
+      "requires_root": true,
+      "network_access": true
+    },
+    "burp": {
+      "executable_path": "/opt/burpsuite/burpsuite_community.jar",
+      "config_file": null,
+      "environment_vars": {
+        "JAVA_HOME": "/usr/lib/jvm/java-11-openjdk"
+      },
+      "docker_image": "securecodebox/burp-enterprise",
+      "timeout": 1800,
+      "max_concurrent": 3,
+      "requires_root": false,
+      "network_access": true
+    },
+    "metasploit": {
+      "executable_path": "/usr/bin/msfconsole",
+      "config_file": "/usr/share/metasploit-framework/config/database.yml",
+      "environment_vars": {},
+      "docker_image": "metasploitframework/metasploit-framework",
+      "timeout": 1800,
+      "max_concurrent": 2,
+      "requires_root": true,
+      "network_access": true
+    },
+    "wireshark": {
+      "executable_path": "/usr/bin/tshark",
+      "config_file": null,
+      "environment_vars": {},
+      "docker_image": "linuxserver/wireshark",
+      "timeout": 300,
+      "max_concurrent": 3,
+      "requires_root": true,
+      "network_access": true
+    },
+    "nikto": {
+      "executable_path": "/usr/bin/nikto",
+      "config_file": "/etc/nikto.conf",
+      "environment_vars": {},
+      "docker_image": "sullo/nikto",
+      "timeout": 1200,
+      "max_concurrent": 3,
+      "requires_root": false,
+      "network_access": true
+    },
+    "sqlmap": {
+      "executable_path": "/usr/bin/sqlmap",
+      "config_file": null,
+      "environment_vars": {},
+      "docker_image": "paoloo/sqlmap",
+      "timeout": 1800,
+      "max_concurrent": 2,
+      "requires_root": false,
+      "network_access": true
+    },
+    "dirb": {
+      "executable_path": "/usr/bin/dirb",
+      "config_file": null,
+      "environment_vars": {},
+      "docker_image": "cytopia/dirb",
+      "timeout": 900,
+      "max_concurrent": 4,
+      "requires_root": false,
+      "network_access": true
+    },
+    "gobuster": {
+      "executable_path": "/usr/bin/gobuster",
+      "config_file": null,
+      "environment_vars": {},
+      "docker_image": "cytopia/gobuster",
+      "timeout": 600,
+      "max_concurrent": 4,
+      "requires_root": false,
+      "network_access": true
+    },
+    "hydra": {
+      "executable_path": "/usr/bin/hydra",
+      "config_file": null,
+      "environment_vars": {},
+      "docker_image": "vanhauser/hydra",
+      "timeout": 1800,
+      "max_concurrent": 2,
+      "requires_root": false,
+      "network_access": true
+    }
+  },
+  "security_policies": {
+    "default": {
+      "max_execution_time": 300,
+      "max_memory_mb": 1024,
+      "max_cpu_percent": 80.0,
+      "allowed_network_access": true,
+      "require_sandbox": true,
+      "max_processes": 10
+    },
+    "network_scan": {
+      "max_execution_time": 600,
+      "max_memory_mb": 2048,
+      "max_cpu_percent": 90.0,
+      "allowed_network_access": true,
+      "require_sandbox": true,
+      "max_processes": 5
+    },
+    "web_scan": {
+      "max_execution_time": 1800,
+      "max_memory_mb": 4096,
+      "max_cpu_percent": 85.0,
+      "allowed_network_access": true,
+      "require_sandbox": true,
+      "max_processes": 8
+    },
+    "vulnerability_scan": {
+      "max_execution_time": 3600,
+      "max_memory_mb": 8192,
+      "max_cpu_percent": 95.0,
+      "allowed_network_access": true,
+      "require_sandbox": true,
+      "max_processes": 15
+    }
+  },
+  "rate_limits": {
+    "global": {
+      "requests_per_minute": 60,
+      "burst_allowance": 10
+    },
+    "per_tool": {
+      "nmap": {
+        "requests_per_minute": 10,
+        "burst_allowance": 3
+      },
+      "nessus": {
+        "requests_per_minute": 5,
+        "burst_allowance": 1
+      },
+      "burp": {
+        "requests_per_minute": 8,
+        "burst_allowance": 2
+      },
+      "metasploit": {
+        "requests_per_minute": 3,
+        "burst_allowance": 1
+      },
+      "wireshark": {
+        "requests_per_minute": 15,
+        "burst_allowance": 5
+      }
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "/var/log/cybercortex/security_tools.log",
+    "max_size_mb": 100,
+    "backup_count": 5,
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "prometheus_port": 9001,
+    "health_check_interval": 30,
+    "performance_tracking": true
+  }
+}
