@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_WS_URL=ws://backend:8000
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - cybercortex
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://cybercortex:secure_password@postgres:5432/cybercortex_db
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=your-super-secret-key-change-in-production
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - BLACKBOX_API_KEY=${BLACKBOX_API_KEY}
+      - CORAL_SERVER_URL=${CORAL_SERVER_URL}
+      - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
+      - SNOWFLAKE_USER=${SNOWFLAKE_USER}
+      - SNOWFLAKE_PASSWORD=${SNOWFLAKE_PASSWORD}
+      - SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}
+      - SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA}
+      - SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE}
+      - FETCHAI_AGENT_ADDRESS=${FETCHAI_AGENT_ADDRESS}
+      - FETCHAI_PRIVATE_KEY=${FETCHAI_PRIVATE_KEY}
+    volumes:
+      - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - cybercortex
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=cybercortex_db
+      - POSTGRES_USER=cybercortex
+      - POSTGRES_PASSWORD=secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - cybercortex
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cybercortex
+
+  agents:
+    build:
+      context: .
+      dockerfile: agents/Dockerfile
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - BLACKBOX_API_KEY=${BLACKBOX_API_KEY}
+      - CORAL_SERVER_URL=${CORAL_SERVER_URL}
+      - FETCHAI_AGENT_ADDRESS=${FETCHAI_AGENT_ADDRESS}
+      - FETCHAI_PRIVATE_KEY=${FETCHAI_PRIVATE_KEY}
+      - BACKEND_URL=http://backend:8000
+    volumes:
+      - ./agents:/app
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - cybercortex
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      - MCP_SERVER_PORT=9000
+      - BACKEND_URL=http://backend:8000
+    volumes:
+      - ./mcp:/app
+    depends_on:
+      - backend
+    networks:
+      - cybercortex
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - cybercortex
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - cybercortex
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  cybercortex:
+    driver: bridge
