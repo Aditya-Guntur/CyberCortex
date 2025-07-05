@@ -1,0 +1,497 @@
+/*
+# CyberCortex Security Analytics Database Schema
+
+Comprehensive database schema for security event ingestion, analytics,
+and compliance reporting with Snowflake optimization.
+
+## Tables Created:
+1. SECURITY_EVENTS - Core security event data
+2. ANALYTICS_METRICS - Computed security metrics
+3. THREAT_INTELLIGENCE - Threat intelligence data
+4. COMPLIANCE_ASSESSMENTS - Compliance framework assessments
+5. RISK_ASSESSMENTS - Risk calculation results
+6. AGENT_ACTIVITIES - Multi-agent system activities
+7. INCIDENT_RESPONSES - Incident response tracking
+
+## Features:
+- Clustering for optimal query performance
+- Time-based partitioning for data lifecycle management
+- Variant columns for flexible metadata storage
+- Automated data retention policies
+*/
+
+-- Create database and schema
+CREATE DATABASE IF NOT EXISTS CYBERCORTEX_DB;
+USE DATABASE CYBERCORTEX_DB;
+
+CREATE SCHEMA IF NOT EXISTS SECURITY_ANALYTICS;
+USE SCHEMA SECURITY_ANALYTICS;
+
+-- Create warehouse for analytics workloads
+CREATE WAREHOUSE IF NOT EXISTS ANALYTICS_WH
+WITH 
+    WAREHOUSE_SIZE = 'MEDIUM'
+    AUTO_SUSPEND = 300
+    AUTO_RESUME = TRUE
+    INITIALLY_SUSPENDED = TRUE
+    COMMENT = 'Warehouse for CyberCortex security analytics';
+
+-- Security Events Table
+CREATE TABLE IF NOT EXISTS SECURITY_EVENTS (
+    EVENT_ID STRING PRIMARY KEY,
+    EVENT_TYPE STRING NOT NULL,
+    TIMESTAMP TIMESTAMP_NTZ NOT NULL,
+    SEVERITY STRING NOT NULL,
+    SOURCE STRING NOT NULL,
+    TARGET STRING,
+    DESCRIPTION STRING,
+    METADATA VARIANT,
+    TAGS ARRAY,
+    CORRELATION_ID STRING,
+    INGESTION_TIME TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    PARTITION_DATE DATE AS (DATE(TIMESTAMP)),
+    
+    -- Computed columns for analytics
+    SEVERITY_SCORE NUMBER AS (
+        CASE SEVERITY
+            WHEN 'critical' THEN 10
+            WHEN 'high' THEN 7
+            WHEN 'medium' THEN 4
+            WHEN 'low' THEN 2
+            WHEN 'info' THEN 1
+            ELSE 3
+        END
+    ),
+    
+    HOUR_OF_DAY NUMBER AS (HOUR(TIMESTAMP)),
+    DAY_OF_WEEK NUMBER AS (DAYOFWEEK(TIMESTAMP))
+) 
+CLUSTER BY (PARTITION_DATE, EVENT_TYPE, SEVERITY)
+COMMENT = 'Core security events with real-time ingestion support';
+
+-- Analytics Metrics Table
+CREATE TABLE IF NOT EXISTS ANALYTICS_METRICS (
+    METRIC_ID STRING PRIMARY KEY,
+    METRIC_NAME STRING NOT NULL,
+    METRIC_VALUE FLOAT NOT NULL,
+    TIMESTAMP TIMESTAMP_NTZ NOT NULL,
+    DIMENSIONS VARIANT,
+    CONFIDENCE FLOAT,
+    TREND STRING,
+    COMPUTATION_TIME TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    PARTITION_DATE DATE AS (DATE(TIMESTAMP))
+) 
+CLUSTER BY (PARTITION_DATE, METRIC_NAME)
+COMMENT = 'Computed security analytics metrics and KPIs';
+
+-- Threat Intelligence Table
+CREATE TABLE IF NOT EXISTS THREAT_INTELLIGENCE (
+    THREAT_ID STRING PRIMARY KEY,
+    THREAT_TYPE STRING NOT NULL,
+    INDICATORS ARRAY NOT NULL,
+    CONFIDENCE FLOAT NOT NULL,
+    SOURCE STRING NOT NULL,
+    FIRST_SEEN TIMESTAMP_NTZ NOT NULL,
+    LAST_SEEN TIMESTAMP_NTZ NOT NULL,
+    METADATA VARIANT,
+    ACTIVE BOOLEAN DEFAULT TRUE,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    -- Computed columns
+    DAYS_ACTIVE NUMBER AS (DATEDIFF(day, FIRST_SEEN, LAST_SEEN)),
+    THREAT_SCORE NUMBER AS (CONFIDENCE * 10)
+) 
+CLUSTER BY (THREAT_TYPE, CONFIDENCE DESC)
+COMMENT = 'Threat intelligence indicators and attribution data';
+
+-- Compliance Assessments Table
+CREATE TABLE IF NOT EXISTS COMPLIANCE_ASSESSMENTS (
+    ASSESSMENT_ID STRING PRIMARY KEY,
+    FRAMEWORK STRING NOT NULL,
+    CONTROL_ID STRING NOT NULL,
+    STATUS STRING NOT NULL,
+    SCORE FLOAT NOT NULL,
+    ASSESSMENT_DATE TIMESTAMP_NTZ NOT NULL,
+    FINDINGS VARIANT,
+    REMEDIATION VARIANT,
+    ASSESSOR STRING,
+    NEXT_ASSESSMENT_DUE DATE,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    -- Computed columns
+    COMPLIANCE_LEVEL STRING AS (
+        CASE 
+            WHEN SCORE >= 90 THEN 'compliant'
+            WHEN SCORE >= 75 THEN 'partial'
+            ELSE 'non_compliant'
+        END
+    )
+) 
+CLUSTER BY (FRAMEWORK, ASSESSMENT_DATE DESC)
+COMMENT = 'Compliance framework assessments and control status';
+
+-- Risk Assessments Table
+CREATE TABLE IF NOT EXISTS RISK_ASSESSMENTS (
+    ASSESSMENT_ID STRING PRIMARY KEY,
+    ASSESSMENT_TYPE STRING NOT NULL,
+    OVERALL_RISK_SCORE FLOAT NOT NULL,
+    THREAT_RISK FLOAT,
+    VULNERABILITY_RISK FLOAT,
+    COMPLIANCE_RISK FLOAT,
+    OPERATIONAL_RISK FLOAT,
+    ASSESSMENT_DATE TIMESTAMP_NTZ NOT NULL,
+    RISK_FACTORS VARIANT,
+    RECOMMENDATIONS VARIANT,
+    ASSESSOR STRING,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    -- Computed columns
+    RISK_LEVEL STRING AS (
+        CASE 
+            WHEN OVERALL_RISK_SCORE >= 8 THEN 'critical'
+            WHEN OVERALL_RISK_SCORE >= 6 THEN 'high'
+            WHEN OVERALL_RISK_SCORE >= 4 THEN 'medium'
+            WHEN OVERALL_RISK_SCORE >= 2 THEN 'low'
+            ELSE 'minimal'
+        END
+    )
+) 
+CLUSTER BY (ASSESSMENT_DATE DESC, OVERALL_RISK_SCORE DESC)
+COMMENT = 'Organizational risk assessments and scoring';
+
+-- Agent Activities Table
+CREATE TABLE IF NOT EXISTS AGENT_ACTIVITIES (
+    ACTIVITY_ID STRING PRIMARY KEY,
+    AGENT_ID STRING NOT NULL,
+    AGENT_TYPE STRING NOT NULL,
+    ACTIVITY_TYPE STRING NOT NULL,
+    STATUS STRING NOT NULL,
+    START_TIME TIMESTAMP_NTZ NOT NULL,
+    END_TIME TIMESTAMP_NTZ,
+    DURATION_SECONDS NUMBER AS (DATEDIFF(second, START_TIME, END_TIME)),
+    RESULTS VARIANT,
+    METADATA VARIANT,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    PARTITION_DATE DATE AS (DATE(START_TIME))
+) 
+CLUSTER BY (PARTITION_DATE, AGENT_TYPE, STATUS)
+COMMENT = 'Multi-agent system activity tracking and coordination';
+
+-- Incident Response Table
+CREATE TABLE IF NOT EXISTS INCIDENT_RESPONSES (
+    INCIDENT_ID STRING PRIMARY KEY,
+    INCIDENT_TYPE STRING NOT NULL,
+    SEVERITY STRING NOT NULL,
+    STATUS STRING NOT NULL,
+    DETECTED_AT TIMESTAMP_NTZ NOT NULL,
+    RESPONDED_AT TIMESTAMP_NTZ,
+    RESOLVED_AT TIMESTAMP_NTZ,
+    ASSIGNED_TO STRING,
+    DESCRIPTION STRING,
+    AFFECTED_SYSTEMS ARRAY,
+    RESPONSE_ACTIONS VARIANT,
+    LESSONS_LEARNED VARIANT,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    -- Computed columns for SLA tracking
+    RESPONSE_TIME_MINUTES NUMBER AS (DATEDIFF(minute, DETECTED_AT, RESPONDED_AT)),
+    RESOLUTION_TIME_MINUTES NUMBER AS (DATEDIFF(minute, DETECTED_AT, RESOLVED_AT)),
+    SLA_MET BOOLEAN AS (
+        CASE SEVERITY
+            WHEN 'critical' THEN RESPONSE_TIME_MINUTES <= 15
+            WHEN 'high' THEN RESPONSE_TIME_MINUTES <= 60
+            WHEN 'medium' THEN RESPONSE_TIME_MINUTES <= 240
+            ELSE TRUE
+        END
+    )
+) 
+CLUSTER BY (DETECTED_AT DESC, SEVERITY)
+COMMENT = 'Incident response tracking and SLA monitoring';
+
+-- Vulnerability Management Table
+CREATE TABLE IF NOT EXISTS VULNERABILITIES (
+    VULNERABILITY_ID STRING PRIMARY KEY,
+    CVE_ID STRING,
+    TITLE STRING NOT NULL,
+    DESCRIPTION STRING,
+    SEVERITY STRING NOT NULL,
+    CVSS_SCORE FLOAT,
+    AFFECTED_SYSTEMS ARRAY,
+    DISCOVERY_DATE TIMESTAMP_NTZ NOT NULL,
+    PATCH_AVAILABLE BOOLEAN DEFAULT FALSE,
+    PATCH_DATE TIMESTAMP_NTZ,
+    STATUS STRING DEFAULT 'open',
+    REMEDIATION_PLAN VARIANT,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    -- Computed columns
+    DAYS_OPEN NUMBER AS (DATEDIFF(day, DISCOVERY_DATE, CURRENT_TIMESTAMP())),
+    PRIORITY_SCORE NUMBER AS (
+        CASE SEVERITY
+            WHEN 'critical' THEN CVSS_SCORE * 2
+            WHEN 'high' THEN CVSS_SCORE * 1.5
+            ELSE CVSS_SCORE
+        END
+    )
+) 
+CLUSTER BY (DISCOVERY_DATE DESC, SEVERITY)
+COMMENT = 'Vulnerability tracking and remediation management';
+
+-- Create views for common analytics queries
+
+-- Security Dashboard View
+CREATE OR REPLACE VIEW SECURITY_DASHBOARD AS
+SELECT 
+    DATE(TIMESTAMP) as EVENT_DATE,
+    EVENT_TYPE,
+    SEVERITY,
+    COUNT(*) as EVENT_COUNT,
+    COUNT(DISTINCT SOURCE) as UNIQUE_SOURCES,
+    AVG(SEVERITY_SCORE) as AVG_SEVERITY_SCORE
+FROM SECURITY_EVENTS
+WHERE TIMESTAMP >= DATEADD(day, -30, CURRENT_TIMESTAMP())
+GROUP BY DATE(TIMESTAMP), EVENT_TYPE, SEVERITY
+ORDER BY EVENT_DATE DESC, EVENT_COUNT DESC;
+
+-- Threat Intelligence Summary View
+CREATE OR REPLACE VIEW THREAT_INTELLIGENCE_SUMMARY AS
+SELECT 
+    THREAT_TYPE,
+    COUNT(*) as THREAT_COUNT,
+    AVG(CONFIDENCE) as AVG_CONFIDENCE,
+    MAX(LAST_SEEN) as LATEST_ACTIVITY,
+    COUNT(CASE WHEN ACTIVE THEN 1 END) as ACTIVE_THREATS
+FROM THREAT_INTELLIGENCE
+GROUP BY THREAT_TYPE
+ORDER BY THREAT_COUNT DESC;
+
+-- Compliance Status View
+CREATE OR REPLACE VIEW COMPLIANCE_STATUS AS
+SELECT 
+    FRAMEWORK,
+    COUNT(*) as TOTAL_CONTROLS,
+    COUNT(CASE WHEN STATUS = 'compliant' THEN 1 END) as COMPLIANT_CONTROLS,
+    COUNT(CASE WHEN STATUS = 'non_compliant' THEN 1 END) as NON_COMPLIANT_CONTROLS,
+    AVG(SCORE) as AVG_SCORE,
+    MAX(ASSESSMENT_DATE) as LATEST_ASSESSMENT
+FROM COMPLIANCE_ASSESSMENTS
+GROUP BY FRAMEWORK
+ORDER BY AVG_SCORE DESC;
+
+-- Risk Trend View
+CREATE OR REPLACE VIEW RISK_TRENDS AS
+SELECT 
+    DATE(ASSESSMENT_DATE) as ASSESSMENT_DATE,
+    AVG(OVERALL_RISK_SCORE) as AVG_RISK_SCORE,
+    AVG(THREAT_RISK) as AVG_THREAT_RISK,
+    AVG(VULNERABILITY_RISK) as AVG_VULNERABILITY_RISK,
+    AVG(COMPLIANCE_RISK) as AVG_COMPLIANCE_RISK,
+    AVG(OPERATIONAL_RISK) as AVG_OPERATIONAL_RISK
+FROM RISK_ASSESSMENTS
+WHERE ASSESSMENT_DATE >= DATEADD(day, -90, CURRENT_TIMESTAMP())
+GROUP BY DATE(ASSESSMENT_DATE)
+ORDER BY ASSESSMENT_DATE DESC;
+
+-- Agent Performance View
+CREATE OR REPLACE VIEW AGENT_PERFORMANCE AS
+SELECT 
+    AGENT_TYPE,
+    COUNT(*) as TOTAL_ACTIVITIES,
+    COUNT(CASE WHEN STATUS = 'completed' THEN 1 END) as COMPLETED_ACTIVITIES,
+    COUNT(CASE WHEN STATUS = 'failed' THEN 1 END) as FAILED_ACTIVITIES,
+    AVG(DURATION_SECONDS) as AVG_DURATION_SECONDS,
+    (COUNT(CASE WHEN STATUS = 'completed' THEN 1 END) * 100.0 / COUNT(*)) as SUCCESS_RATE
+FROM AGENT_ACTIVITIES
+WHERE START_TIME >= DATEADD(day, -7, CURRENT_TIMESTAMP())
+GROUP BY AGENT_TYPE
+ORDER BY SUCCESS_RATE DESC;
+
+-- Create stored procedures for common operations
+
+-- Procedure to calculate security score
+CREATE OR REPLACE PROCEDURE CALCULATE_SECURITY_SCORE(DAYS_BACK NUMBER)
+RETURNS FLOAT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    threat_score FLOAT;
+    vulnerability_score FLOAT;
+    compliance_score FLOAT;
+    incident_score FLOAT;
+    overall_score FLOAT;
+BEGIN
+    -- Calculate threat score (lower is better)
+    SELECT 100 - (COUNT(*) * 0.5) INTO threat_score
+    FROM SECURITY_EVENTS
+    WHERE EVENT_TYPE = 'threat_detected'
+    AND TIMESTAMP >= DATEADD(day, -DAYS_BACK, CURRENT_TIMESTAMP());
+    
+    -- Calculate vulnerability score
+    SELECT 100 - (COUNT(*) * 0.3) INTO vulnerability_score
+    FROM VULNERABILITIES
+    WHERE STATUS = 'open'
+    AND DISCOVERY_DATE >= DATEADD(day, -DAYS_BACK, CURRENT_TIMESTAMP());
+    
+    -- Calculate compliance score
+    SELECT AVG(SCORE) INTO compliance_score
+    FROM COMPLIANCE_ASSESSMENTS
+    WHERE ASSESSMENT_DATE >= DATEADD(day, -DAYS_BACK, CURRENT_TIMESTAMP());
+    
+    -- Calculate incident response score
+    SELECT 100 - (COUNT(*) * 1.0) INTO incident_score
+    FROM INCIDENT_RESPONSES
+    WHERE STATUS != 'resolved'
+    AND DETECTED_AT >= DATEADD(day, -DAYS_BACK, CURRENT_TIMESTAMP());
+    
+    -- Calculate weighted overall score
+    SET overall_score = (
+        COALESCE(threat_score, 90) * 0.3 +
+        COALESCE(vulnerability_score, 90) * 0.25 +
+        COALESCE(compliance_score, 90) * 0.25 +
+        COALESCE(incident_score, 90) * 0.2
+    );
+    
+    -- Ensure score is between 0 and 100
+    SET overall_score = GREATEST(0, LEAST(100, overall_score));
+    
+    RETURN overall_score;
+END;
+$$;
+
+-- Procedure to generate compliance report
+CREATE OR REPLACE PROCEDURE GENERATE_COMPLIANCE_REPORT(FRAMEWORK_NAME STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    report VARIANT;
+BEGIN
+    SELECT OBJECT_CONSTRUCT(
+        'framework', FRAMEWORK_NAME,
+        'total_controls', COUNT(*),
+        'compliant_controls', COUNT(CASE WHEN STATUS = 'compliant' THEN 1 END),
+        'non_compliant_controls', COUNT(CASE WHEN STATUS = 'non_compliant' THEN 1 END),
+        'overall_score', AVG(SCORE),
+        'last_assessment', MAX(ASSESSMENT_DATE),
+        'controls', ARRAY_AGG(OBJECT_CONSTRUCT(
+            'control_id', CONTROL_ID,
+            'status', STATUS,
+            'score', SCORE,
+            'assessment_date', ASSESSMENT_DATE
+        ))
+    ) INTO report
+    FROM COMPLIANCE_ASSESSMENTS
+    WHERE FRAMEWORK = FRAMEWORK_NAME
+    AND ASSESSMENT_DATE >= DATEADD(day, -30, CURRENT_TIMESTAMP());
+    
+    RETURN report;
+END;
+$$;
+
+-- Create tasks for automated data maintenance
+
+-- Task to clean old security events (retain 1 year)
+CREATE OR REPLACE TASK CLEANUP_OLD_EVENTS
+    WAREHOUSE = ANALYTICS_WH
+    SCHEDULE = 'USING CRON 0 2 * * SUN'  -- Weekly on Sunday at 2 AM
+AS
+DELETE FROM SECURITY_EVENTS
+WHERE TIMESTAMP < DATEADD(year, -1, CURRENT_TIMESTAMP());
+
+-- Task to update threat intelligence status
+CREATE OR REPLACE TASK UPDATE_THREAT_INTELLIGENCE
+    WAREHOUSE = ANALYTICS_WH
+    SCHEDULE = 'USING CRON 0 1 * * *'  -- Daily at 1 AM
+AS
+UPDATE THREAT_INTELLIGENCE
+SET ACTIVE = FALSE
+WHERE LAST_SEEN < DATEADD(day, -30, CURRENT_TIMESTAMP())
+AND ACTIVE = TRUE;
+
+-- Task to calculate daily security metrics
+CREATE OR REPLACE TASK CALCULATE_DAILY_METRICS
+    WAREHOUSE = ANALYTICS_WH
+    SCHEDULE = 'USING CRON 0 0 * * *'  -- Daily at midnight
+AS
+INSERT INTO ANALYTICS_METRICS (
+    METRIC_ID,
+    METRIC_NAME,
+    METRIC_VALUE,
+    TIMESTAMP,
+    DIMENSIONS
+)
+SELECT 
+    'daily_security_score_' || TO_CHAR(CURRENT_DATE(), 'YYYYMMDD'),
+    'daily_security_score',
+    CALCULATE_SECURITY_SCORE(1),
+    CURRENT_TIMESTAMP(),
+    OBJECT_CONSTRUCT('calculation_date', CURRENT_DATE());
+
+-- Create file formats for data ingestion
+
+-- JSON file format for security events
+CREATE OR REPLACE FILE FORMAT JSON_FORMAT
+    TYPE = JSON
+    STRIP_OUTER_ARRAY = TRUE
+    COMMENT = 'JSON format for security event ingestion';
+
+-- CSV file format for bulk data loads
+CREATE OR REPLACE FILE FORMAT CSV_FORMAT
+    TYPE = CSV
+    FIELD_DELIMITER = ','
+    RECORD_DELIMITER = '\n'
+    SKIP_HEADER = 1
+    FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+    COMMENT = 'CSV format for bulk data ingestion';
+
+-- Create stages for data ingestion
+
+-- Internal stage for security events
+CREATE OR REPLACE STAGE SECURITY_EVENTS_STAGE
+    FILE_FORMAT = JSON_FORMAT
+    COMMENT = 'Stage for real-time security event ingestion';
+
+-- External stage for bulk data loads (example with S3)
+-- CREATE OR REPLACE STAGE EXTERNAL_DATA_STAGE
+--     URL = 's3://cybercortex-data-bucket/'
+--     CREDENTIALS = (AWS_KEY_ID = 'your_key' AWS_SECRET_KEY = 'your_secret')
+--     FILE_FORMAT = JSON_FORMAT
+--     COMMENT = 'External stage for bulk data ingestion';
+
+-- Create pipes for automatic ingestion
+
+-- Pipe for security events
+CREATE OR REPLACE PIPE SECURITY_EVENTS_PIPE
+    AUTO_INGEST = TRUE
+    AS COPY INTO SECURITY_EVENTS
+    FROM @SECURITY_EVENTS_STAGE
+    FILE_FORMAT = JSON_FORMAT
+    ON_ERROR = 'CONTINUE'
+    COMMENT = 'Automated pipe for security event ingestion';
+
+-- Grant necessary permissions
+-- GRANT USAGE ON WAREHOUSE ANALYTICS_WH TO ROLE CYBERCORTEX_ROLE;
+-- GRANT ALL ON DATABASE CYBERCORTEX_DB TO ROLE CYBERCORTEX_ROLE;
+-- GRANT ALL ON SCHEMA SECURITY_ANALYTICS TO ROLE CYBERCORTEX_ROLE;
+-- GRANT ALL ON ALL TABLES IN SCHEMA SECURITY_ANALYTICS TO ROLE CYBERCORTEX_ROLE;
+-- GRANT ALL ON ALL VIEWS IN SCHEMA SECURITY_ANALYTICS TO ROLE CYBERCORTEX_ROLE;
+
+-- Enable tasks
+-- ALTER TASK CLEANUP_OLD_EVENTS RESUME;
+-- ALTER TASK UPDATE_THREAT_INTELLIGENCE RESUME;
+-- ALTER TASK CALCULATE_DAILY_METRICS RESUME;
+
+-- Create sample data for testing (optional)
+/*
+INSERT INTO SECURITY_EVENTS VALUES
+('evt_001', 'threat_detected', '2024-01-15 10:30:00', 'high', 'network_monitor', 'web_server_01', 'Suspicious network activity', 
+ PARSE_JSON('{"source_ip": "192.168.1.100", "attack_type": "port_scan"}'), 
+ ARRAY_CONSTRUCT('network', 'reconnaissance'), NULL),
+('evt_002', 'vulnerability_found', '2024-01-15 11:45:00', 'critical', 'vulnerability_scanner', 'database_server', 'SQL injection vulnerability',
+ PARSE_JSON('{"cvss_score": 9.1, "cve_id": "CVE-2024-0001"}'),
+ ARRAY_CONSTRUCT('web', 'injection'), NULL);
+*/
+
+COMMIT;
