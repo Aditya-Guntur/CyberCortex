@@ -10,7 +10,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <DashboardHeader />
       
       <main className="container mx-auto px-4 py-8 space-y-8">
@@ -62,7 +62,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-sm text-muted-foreground pt-8 border-t">
+        <div className="text-center text-sm text-muted-foreground pt-8 border-t border-border">
           <p>
             Built for Raise Your Hack 2025 • Blackbox.ai Track • 
             <span className="text-cyber-500 font-medium"> Securing the digital world, one agent at a time</span>

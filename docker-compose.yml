@@ -27,8 +27,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://cybercortex:secure_password@postgres:5432/cybercortex_db
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
       - SECRET_KEY=your-super-secret-key-change-in-production
       - GROQ_API_KEY=${GROQ_API_KEY}
       - BLACKBOX_API_KEY=${BLACKBOX_API_KEY}
