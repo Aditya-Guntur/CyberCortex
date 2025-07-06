@@ -97,10 +97,14 @@ async def shutdown_event():
 # WebSocket connection
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    active_connections.append(websocket)
+    logger.info(f"WebSocket connection attempt from {websocket.client.host}:{websocket.client.port}")
+    logger.info(f"WebSocket headers: {websocket.headers}")
     
     try:
+        await websocket.accept()
+        logger.info("WebSocket connection accepted")
+        active_connections.append(websocket)
+        
         # Send initial state
         await websocket.send_json({
             "type": "simulation_state",
@@ -117,6 +121,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"type": "pong"})
             
     except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
         active_connections.remove(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {str(e)}")

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        
+        function addMessage(message) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            messagesDiv.appendChild(div);
+        }
+        
+        try {
+            const ws = new WebSocket('ws://localhost:8000/ws');
+            
+            ws.onopen = function() {
+                statusDiv.textContent = 'Connected!';
+                statusDiv.style.color = 'green';
+                addMessage('WebSocket connected successfully');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                addMessage('Received: ' + JSON.stringify(data, null, 2));
+            };
+            
+            ws.onclose = function(event) {
+                statusDiv.textContent = 'Disconnected: ' + event.code + ' - ' + event.reason;
+                statusDiv.style.color = 'red';
+                addMessage('WebSocket closed: ' + event.code + ' - ' + event.reason);
+            };
+            
+            ws.onerror = function(error) {
+                statusDiv.textContent = 'Error!';
+                statusDiv.style.color = 'red';
+                addMessage('WebSocket error: ' + error);
+            };
+            
+        } catch (error) {
+            statusDiv.textContent = 'Failed to create WebSocket';
+            statusDiv.style.color = 'red';
+            addMessage('Error creating WebSocket: ' + error);
+        }
+    </script>
+</body>
+</html> 
