@@ -32,6 +32,7 @@ interface SimulationState {
   handleVulnerabilityDiscovered: (data: any) => void;
   handleExploitGenerated: (data: any) => void;
   handlePhaseChange: (data: any) => void;
+  handleSimulationState: (data: any) => void;
 }
 
 export const useSimulationState = create<SimulationState>()(
@@ -238,6 +239,16 @@ export const useSimulationState = create<SimulationState>()(
           current_phase: data.phase
         }
       }));
+    },
+
+    // NEW: Handle full simulation state update from backend
+    handleSimulationState: (data) => {
+      set({
+        simulation: data,
+        hosts: data.discovered_hosts || [],
+        vulnerabilities: data.discovered_vulnerabilities || [],
+        exploits: data.executed_exploits || []
+      });
     }
   }))
 );
@@ -250,7 +261,8 @@ export function setupSimulationWebSocketHandlers() {
     handleHostDiscovered,
     handleVulnerabilityDiscovered,
     handleExploitGenerated,
-    handlePhaseChange
+    handlePhaseChange,
+    handleSimulationState
   } = useSimulationState.getState();
   
   // Register WebSocket message handlers
@@ -260,4 +272,5 @@ export function setupSimulationWebSocketHandlers() {
   useWebSocket.getState().addMessageHandler('vulnerability_discovered', handleVulnerabilityDiscovered);
   useWebSocket.getState().addMessageHandler('exploit_generated', handleExploitGenerated);
   useWebSocket.getState().addMessageHandler('phase_change', handlePhaseChange);
+  useWebSocket.getState().addMessageHandler('simulation_state', handleSimulationState);
 }
