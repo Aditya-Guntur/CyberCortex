@@ -398,19 +398,19 @@ async def run_simulation(config: SimulationConfig):
         # Phase 1: Initialize Environment
         simulation_state["current_phase"] = "initializing"
         await broadcast_update("phase_change", {"phase": "initializing"})
-        
-        # Simulate initialization delay
+        await broadcast_update("simulation_state", simulation_state)
         await asyncio.sleep(3)
         
         # Phase 2: Network Discovery with Fetch.ai agents
         simulation_state["current_phase"] = "network_discovery"
         simulation_state["ai_services"]["fetch_agents"]["status"] = "active"
         simulation_state["ai_services"]["fetch_agents"]["last_activity"] = datetime.now().isoformat()
-        
         await broadcast_update("phase_change", {"phase": "network_discovery"})
-        
-        # Simulate network discovery
+        await broadcast_update("simulation_state", simulation_state)
         await asyncio.sleep(5)
+        simulation_state["ai_services"]["fetch_agents"]["status"] = "idle"
+        simulation_state["ai_services"]["fetch_agents"]["last_activity"] = datetime.now().isoformat()
+        await broadcast_update("simulation_state", simulation_state)
         
         # Add discovered hosts
         discovered_hosts = [
@@ -455,25 +455,22 @@ async def run_simulation(config: SimulationConfig):
                 "os_info": {"name": "Embedded Linux", "type": "Linux"}
             }
         ]
-        
         simulation_state["discovered_hosts"] = discovered_hosts
-        
-        # Broadcast host discovery updates
         for host in discovered_hosts:
             await broadcast_update("host_discovered", host)
-            await asyncio.sleep(1)  # Stagger updates for visual effect
-        
-        simulation_state["ai_services"]["fetch_agents"]["status"] = "idle"
+            await asyncio.sleep(1)
+        await broadcast_update("simulation_state", simulation_state)
         
         # Phase 3: Vulnerability Analysis with Groq
         simulation_state["current_phase"] = "vulnerability_analysis"
         simulation_state["ai_services"]["groq_analyzers"]["status"] = "active"
         simulation_state["ai_services"]["groq_analyzers"]["last_activity"] = datetime.now().isoformat()
-        
         await broadcast_update("phase_change", {"phase": "vulnerability_analysis"})
-        
-        # Simulate vulnerability analysis
+        await broadcast_update("simulation_state", simulation_state)
         await asyncio.sleep(5)
+        simulation_state["ai_services"]["groq_analyzers"]["status"] = "idle"
+        simulation_state["ai_services"]["groq_analyzers"]["last_activity"] = datetime.now().isoformat()
+        await broadcast_update("simulation_state", simulation_state)
         
         # Add discovered vulnerabilities
         discovered_vulnerabilities = [
@@ -503,12 +500,12 @@ async def run_simulation(config: SimulationConfig):
                 "severity": "medium",
                 "description": "Cross-site scripting vulnerability in search function",
                 "cve": "CVE-2020-54321",
-                "cvss_score": 6.5,
+                "cvss_score": 5.4,
                 "discovered_at": datetime.now().isoformat(),
                 "details": {
                     "url": "http://172.20.0.2:80/search.php",
                     "parameter": "q",
-                    "proof_of_concept": "<script>alert('XSS')</script>"
+                    "proof_of_concept": "<script>alert(1)</script>"
                 }
             },
             {
@@ -561,57 +558,53 @@ async def run_simulation(config: SimulationConfig):
                 }
             }
         ]
-        
         simulation_state["discovered_vulnerabilities"] = discovered_vulnerabilities
-        
-        # Broadcast vulnerability discovery updates
         for vuln in discovered_vulnerabilities:
             await broadcast_update("vulnerability_discovered", vuln)
-            await asyncio.sleep(1.5)  # Stagger updates for visual effect
+            await asyncio.sleep(1)
+        await broadcast_update("simulation_state", simulation_state)
         
-        simulation_state["ai_services"]["groq_analyzers"]["status"] = "idle"
+        # Phase 4: Exploit Generation with Blackbox Generator
+        simulation_state["current_phase"] = "exploit_generation"
+        simulation_state["ai_services"]["blackbox_generator"]["status"] = "active"
+        simulation_state["ai_services"]["blackbox_generator"]["last_activity"] = datetime.now().isoformat()
+        await broadcast_update("phase_change", {"phase": "exploit_generation"})
+        await broadcast_update("simulation_state", simulation_state)
+        await asyncio.sleep(5)
+        simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
+        simulation_state["ai_services"]["blackbox_generator"]["last_activity"] = datetime.now().isoformat()
+        await broadcast_update("simulation_state", simulation_state)
         
-        # Phase 4: Exploit Generation with Blackbox.ai
-        if config.exploit_validation:
-            simulation_state["current_phase"] = "exploit_generation"
-            simulation_state["ai_services"]["blackbox_generator"]["status"] = "active"
-            simulation_state["ai_services"]["blackbox_generator"]["last_activity"] = datetime.now().isoformat()
+        # Generate exploits for vulnerabilities
+        executed_exploits = []
+        
+        for vuln in discovered_vulnerabilities:
+            # Simulate exploit generation delay
+            await asyncio.sleep(2)
             
-            await broadcast_update("phase_change", {"phase": "exploit_generation"})
-            
-            # Simulate exploit generation
-            await asyncio.sleep(5)
-            
-            # Generate exploits for vulnerabilities
-            executed_exploits = []
-            
-            for vuln in discovered_vulnerabilities:
-                # Simulate exploit generation delay
-                await asyncio.sleep(2)
-                
-                # Create exploit
-                exploit = {
-                    "id": f"exploit_{vuln['id']}",
-                    "vulnerability_id": vuln["id"],
-                    "type": vuln["type"],
-                    "target": {
-                        "host": vuln["host"],
-                        "port": vuln["port"],
-                        "service": vuln["service"]
-                    },
-                    "language": "python",
-                    "generated_at": datetime.now().isoformat(),
-                    "executed": True,
-                    "execution_result": {
-                        "success": True,
-                        "output": f"[+] Exploit executed successfully against {vuln['host']}",
-                        "execution_time_ms": 1500
-                    }
+            # Create exploit
+            exploit = {
+                "id": f"exploit_{vuln['id']}",
+                "vulnerability_id": vuln["id"],
+                "type": vuln["type"],
+                "target": {
+                    "host": vuln["host"],
+                    "port": vuln["port"],
+                    "service": vuln["service"]
+                },
+                "language": "python",
+                "generated_at": datetime.now().isoformat(),
+                "executed": True,
+                "execution_result": {
+                    "success": True,
+                    "output": f"[+] Exploit executed successfully against {vuln['host']}",
+                    "execution_time_ms": 1500
                 }
-                
-                # Add exploit code based on vulnerability type
-                if vuln["type"] == "sql_injection":
-                    exploit["code"] = """
+            }
+            
+            # Add exploit code based on vulnerability type
+            if vuln["type"] == "sql_injection":
+                exploit["code"] = """
 #!/usr/bin/env python3
 # SQL Injection Exploit
 
@@ -646,8 +639,8 @@ try:
 except Exception as e:
     print(f"[-] Error during exploitation: {str(e)}")
 """
-                elif vuln["type"] == "command_injection":
-                    exploit["code"] = """
+            elif vuln["type"] == "command_injection":
+                exploit["code"] = """
 #!/usr/bin/env python3
 # Command Injection Exploit
 
@@ -684,8 +677,8 @@ try:
 except Exception as e:
     print(f"[-] Error during exploitation: {str(e)}")
 """
-                elif vuln["type"] == "weak_password":
-                    exploit["code"] = """
+            elif vuln["type"] == "weak_password":
+                exploit["code"] = """
 #!/usr/bin/env python3
 # Weak Password Exploit
 
@@ -722,36 +715,37 @@ try:
 except Exception as e:
     print(f"[-] Login failed: {str(e)}")
 """
-                
-                executed_exploits.append(exploit)
-                
-                # Broadcast exploit update
-                await broadcast_update("exploit_generated", exploit)
             
-            simulation_state["executed_exploits"] = executed_exploits
-            simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
+            executed_exploits.append(exploit)
+            
+            # Broadcast exploit update
+            await broadcast_update("exploit_generated", exploit)
         
-        # Phase 5: AI Coordination with Coral Protocol
+        simulation_state["executed_exploits"] = executed_exploits
+        simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
+        await broadcast_update("simulation_state", simulation_state)
+        
+        # Phase 5: AI Coordination with Coral Coordinator
         simulation_state["current_phase"] = "ai_coordination"
         simulation_state["ai_services"]["coral_coordinator"]["status"] = "active"
         simulation_state["ai_services"]["coral_coordinator"]["last_activity"] = datetime.now().isoformat()
-        
         await broadcast_update("phase_change", {"phase": "ai_coordination"})
-        
-        # Simulate AI coordination
+        await broadcast_update("simulation_state", simulation_state)
         await asyncio.sleep(3)
-        
         simulation_state["ai_services"]["coral_coordinator"]["status"] = "idle"
+        simulation_state["ai_services"]["coral_coordinator"]["last_activity"] = datetime.now().isoformat()
+        await broadcast_update("simulation_state", simulation_state)
         
-        # Phase 6: Analytics with Snowflake
+        # Phase 6: Analytics with Snowflake Analyzer
         simulation_state["current_phase"] = "analytics"
         simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "active"
         simulation_state["ai_services"]["snowflake_analyzer"]["last_activity"] = datetime.now().isoformat()
-        
         await broadcast_update("phase_change", {"phase": "analytics"})
-        
-        # Simulate analytics processing
+        await broadcast_update("simulation_state", simulation_state)
         await asyncio.sleep(3)
+        simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "idle"
+        simulation_state["ai_services"]["snowflake_analyzer"]["last_activity"] = datetime.now().isoformat()
+        await broadcast_update("simulation_state", simulation_state)
         
         # Generate analytics results
         analytics_results = {
@@ -780,11 +774,11 @@ except Exception as e:
         await broadcast_update("analytics_results", analytics_results)
         
         simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "idle"
+        await broadcast_update("simulation_state", simulation_state)
         
         # Phase 7: Simulation Complete
         simulation_state["current_phase"] = "completed"
         simulation_state["running"] = False
-        
         await broadcast_update("simulation_completed", {
             "simulation_id": simulation_state["simulation_id"],
             "start_time": simulation_state["start_time"],
@@ -793,26 +787,21 @@ except Exception as e:
             "discovered_vulnerabilities": len(simulation_state["discovered_vulnerabilities"]),
             "executed_exploits": len(simulation_state["executed_exploits"])
         })
-        
+        await broadcast_update("simulation_state", simulation_state)
         logger.info(f"Simulation {simulation_state['simulation_id']} completed")
-        
+
     except Exception as e:
         logger.error(f"Error in simulation: {str(e)}")
-        
-        # Update simulation state
         simulation_state["running"] = False
         simulation_state["current_phase"] = "error"
-        
-        # Reset AI service status
         for service in simulation_state["ai_services"]:
             simulation_state["ai_services"][service]["status"] = "idle"
-        
-        # Broadcast error
         await broadcast_update("simulation_error", {
             "simulation_id": simulation_state["simulation_id"],
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         })
+        await broadcast_update("simulation_state", simulation_state)
 
 # Run the application
 if __name__ == "__main__":
