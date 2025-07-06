@@ -1,0 +1,118 @@
+version: '3.8'
+
+networks:
+  simulation_network:
+    driver: bridge
+
+services:
+  # Vulnerable Web Server (DVWA)
+  vulnerable-web-server:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    ports:
+      - "8080:80"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.2
+    restart: unless-stopped
+
+  # Vulnerable SSH Server
+  vulnerable-ssh-server:
+    image: vulnerables/ssh-server
+    build:
+      context: ./vulnerable-services/ssh-audit
+      dockerfile: Dockerfile
+    container_name: ssh-audit
+    ports:
+      - "2222:22"
+    environment:
+      - SSH_USERS=testuser:testpassword:1000:1000
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.3
+    restart: unless-stopped
+
+  # Vulnerable Database Server
+  vulnerable-database:
+    image: mysql:5.7
+    container_name: mysql-vulnerable
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=insecure_root_password
+      - MYSQL_DATABASE=vulnerable_db
+      - MYSQL_USER=dbuser
+      - MYSQL_PASSWORD=dbpassword
+    volumes:
+      - ./vulnerable-services/mysql-vulnerable/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.4
+    restart: unless-stopped
+
+  # Network Router Simulation
+  network-router:
+    image: alpine:latest
+    container_name: network-router
+    command: sh -c "apk add --no-cache iptables && tail -f /dev/null"
+    cap_add:
+      - NET_ADMIN
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.5
+    restart: unless-stopped
+
+  # IoT Device Simulation
+  iot-device:
+    image: alpine:latest
+    container_name: iot-device
+    command: sh -c "apk add --no-cache python3 && python3 -m http.server 8888"
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./vulnerable-services/network-devices/iot-device:/app
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.6
+    restart: unless-stopped
+
+  # Monitoring Server
+  monitoring-server:
+    image: ubuntu:20.04
+    container_name: monitoring-server
+    command: sh -c "apt-get update && apt-get install -y nmap tcpdump && tail -f /dev/null"
+    cap_add:
+      - NET_ADMIN
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.7
+    restart: unless-stopped
+
+  # Simulation Controller
+  simulation-controller:
+    build:
+      context: ./simulation-controller
+      dockerfile: Dockerfile
+    container_name: simulation-controller
+    volumes:
+      - ./simulation-controller:/app
+    depends_on:
+      - vulnerable-web-server
+      - vulnerable-ssh-server
+      - vulnerable-database
+      - network-router
+      - iot-device
+      - monitoring-server
+    networks:
+      simulation_network:
+        ipv4_address: 172.20.0.8
+    restart: unless-stopped
+
+networks:
+  simulation_network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
