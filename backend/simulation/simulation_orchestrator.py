@@ -182,7 +182,9 @@ async def start_simulation(config: SimulationConfig, background_tasks: Backgroun
     simulation_state["simulation_id"] = simulation_id
     simulation_state["start_time"] = datetime.now().isoformat()
     simulation_state["current_phase"] = "initializing"
-    simulation_state["discovered_hosts"] = []
+    # Don't clear discovered hosts - keep them for visualization
+    if not simulation_state["discovered_hosts"]:
+        simulation_state["discovered_hosts"] = []
     simulation_state["discovered_vulnerabilities"] = []
     simulation_state["executed_exploits"] = []
     
@@ -250,6 +252,17 @@ async def get_network_topology():
     nodes = []
     edges = []
     
+    # Color legend by type
+    type_color_map = {
+        "router": "orange",
+        "web_server": "#3b82f6",   # blue-500
+        "ssh_server": "#22c55e",   # green-500
+        "database": "#a21caf",     # purple-500
+        "iot_device": "#ef4444",   # red
+        "monitoring": "#06b6d4",   # cyan-500
+        "unknown": "#9ca3af"       # gray-400
+    }
+    
     # Add router as central node
     nodes.append({
         "id": "router",
@@ -258,47 +271,80 @@ async def get_network_topology():
         "ip": "172.20.0.5",
         "x": 0,
         "y": 0,
-        "color": "orange",
+        "color": type_color_map["router"],
         "size": 30
     })
     
+    # Get hosts to display - use discovered hosts or default hosts if none
+    hosts_to_display = simulation_state["discovered_hosts"]
+    if not hosts_to_display:
+        # Default hosts for demonstration when no simulation has been run
+        hosts_to_display = [
+            {
+                "ip_address": "172.20.0.2",
+                "hostname": "web-server",
+                "type": "web_server",
+                "status": "up",
+                "services": [
+                    {"name": "http", "port": 80, "protocol": "tcp", "product": "Apache httpd", "version": "2.4.38"}
+                ],
+                "os_info": {"name": "Linux 4.15", "type": "Linux"}
+            },
+            {
+                "ip_address": "172.20.0.3",
+                "hostname": "ssh-server",
+                "type": "ssh_server",
+                "status": "up",
+                "services": [
+                    {"name": "ssh", "port": 22, "protocol": "tcp", "product": "OpenSSH", "version": "7.9p1"}
+                ],
+                "os_info": {"name": "Ubuntu 20.04", "type": "Linux"}
+            },
+            {
+                "ip_address": "172.20.0.4",
+                "hostname": "db-server",
+                "type": "database",
+                "status": "up",
+                "services": [
+                    {"name": "mysql", "port": 3306, "protocol": "tcp", "product": "MySQL", "version": "5.7.32"}
+                ],
+                "os_info": {"name": "Debian 10", "type": "Linux"}
+            },
+            {
+                "ip_address": "172.20.0.6",
+                "hostname": "iot-device",
+                "type": "iot_device",
+                "status": "up",
+                "services": [
+                    {"name": "http", "port": 8888, "protocol": "tcp", "product": "IoT Control Interface", "version": "1.0.2"}
+                ],
+                "os_info": {"name": "Embedded Linux", "type": "Linux"}
+            }
+        ]
+    
     # Add discovered hosts
-    for i, host in enumerate(simulation_state["discovered_hosts"]):
+    for i, host in enumerate(hosts_to_display):
         # Calculate position in a circle around the router
-        angle = i * (360 / max(len(simulation_state["discovered_hosts"]), 1))
+        angle = i * (360 / max(len(hosts_to_display), 1))
         radius = 200
         x = radius * math.cos(math.radians(angle))
         y = radius * math.sin(math.radians(angle))
         
-        # Determine node color based on vulnerabilities
-        color = "blue"
-        host_vulns = [v for v in simulation_state["discovered_vulnerabilities"] 
-                     if v.get("host") == host.get("ip_address")]
-        
-        if host_vulns:
-            max_severity = max([v.get("severity", "low") for v in host_vulns], 
-                              key=lambda s: {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}.get(s, 0))
-            
-            if max_severity == "critical":
-                color = "darkred"
-            elif max_severity == "high":
-                color = "red"
-            elif max_severity == "medium":
-                color = "orange"
-            elif max_severity == "low":
-                color = "yellow"
+        # Assign color based on type legend
+        host_type = host.get("type", "unknown")
+        color = type_color_map.get(host_type, type_color_map["unknown"])
         
         nodes.append({
             "id": host.get("ip_address"),
             "label": host.get("hostname", host.get("ip_address")),
-            "type": host.get("type", "unknown"),
+            "type": host_type,
             "ip": host.get("ip_address"),
             "x": x,
             "y": y,
             "color": color,
             "size": 20,
             "services": host.get("services", []),
-            "vulnerabilities": len(host_vulns)
+            "vulnerabilities": 0  # You can update this if you want to show vuln count
         })
         
         # Add edge to router
