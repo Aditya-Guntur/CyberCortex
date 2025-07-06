@@ -13,6 +13,8 @@ import logging
 import asyncio
 import aiohttp
 import redis.asyncio as redis
+import networkx as nx
+import math
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
@@ -265,8 +267,8 @@ async def get_network_topology():
         # Calculate position in a circle around the router
         angle = i * (360 / max(len(simulation_state["discovered_hosts"]), 1))
         radius = 200
-        x = radius * nx.utils.cos(angle)
-        y = radius * nx.utils.sin(angle)
+        x = radius * math.cos(math.radians(angle))
+        y = radius * math.sin(math.radians(angle))
         
         # Determine node color based on vulnerabilities
         color = "blue"
