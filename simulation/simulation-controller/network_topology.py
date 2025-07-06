@@ -15,6 +15,10 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+import dotenv
+
+# Load environment variables from .env
+dotenv.load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
