@@ -63,8 +63,8 @@ export const useDashboard = create<DashboardStore>()(
       try {
         const currentFilters = filters || get().filters
         const params = new URLSearchParams({
-          timeRange: currentFilters.selectedTimeRange || '24h',
-          severity: currentFilters.severity.join(','),
+          timeRange: currentFilters.timeRange?.preset || '24h',
+          severity: currentFilters.severity?.join(',') || 'critical,high,medium,low,info',
         })
 
         const response = await fetch(`/api/threats?${params}`)
@@ -82,8 +82,8 @@ export const useDashboard = create<DashboardStore>()(
       try {
         const currentFilters = filters || get().filters
         const params = new URLSearchParams({
-          status: currentFilters.status.join(','),
-          severity: currentFilters.severity.join(','),
+          status: currentFilters.status?.join(',') || '',
+          severity: currentFilters.severity?.join(',') || 'critical,high,medium,low,info',
         })
 
         const response = await fetch(`/api/vulnerabilities?${params}`)
@@ -140,7 +140,7 @@ export const useDashboard = create<DashboardStore>()(
       try {
         const currentFilters = filters || get().filters
         const params = new URLSearchParams({
-          severity: currentFilters.severity.join(','),
+          severity: currentFilters.severity?.join(',') || 'critical,high,medium,low,info',
           status: 'new,acknowledged,investigating',
         })
 

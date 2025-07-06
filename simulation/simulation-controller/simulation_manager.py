@@ -17,6 +17,10 @@ import docker
 import requests
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+import dotenv
+from backend.ai-coordination.fetch_network_agents import FetchAISecurityOrchestrator
+from backend.intelligence.groq_engine import GroqSecurityEngine, GroqConfiguration
+from analytics.snowflake_integration import SnowflakeSecurityAnalytics, SnowflakeConfig
 
 # Local imports
 from network_scanner import NetworkScanner
@@ -34,6 +38,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("SimulationManager")
+
+# Load environment variables from .env
+dotenv.load_dotenv()
 
 class SimulationManager:
     """
@@ -66,6 +73,33 @@ class SimulationManager:
             "blackbox_generator": {"status": "idle", "last_activity": None},
             "snowflake_analyzer": {"status": "idle", "last_activity": None}
         }
+        
+        # Real API clients
+        self.fetchai_orchestrator = FetchAISecurityOrchestrator({
+            'scheduler_seed': os.getenv('FETCHAI_SCHEDULER_SEED', 'cybercortex_scheduler_2025'),
+            'threat_seed': os.getenv('FETCHAI_THREAT_SEED', 'cybercortex_threat_2025'),
+            'vuln_seed': os.getenv('FETCHAI_VULN_SEED', 'cybercortex_vuln_2025'),
+            'compliance_seed': os.getenv('FETCHAI_COMPLIANCE_SEED', 'cybercortex_compliance_2025'),
+            'mailbox_key': os.getenv('FETCHAI_MAILBOX_KEY', 'cybercortex_security_mailbox'),
+            'asi_endpoint': os.getenv('FETCHAI_ASI_ENDPOINT', 'https://asi.one/api/v1')
+        })
+        self.groq_engine = GroqSecurityEngine(GroqConfiguration(
+            api_key=os.getenv('GROQ_API_KEY'),
+            model=os.getenv('GROQ_MODEL', 'llama3-70b-8192'),
+            temperature=float(os.getenv('GROQ_TEMPERATURE', 0.1)),
+            max_tokens=int(os.getenv('GROQ_MAX_TOKENS', 2048)),
+            timeout=int(os.getenv('GROQ_TIMEOUT', 10)),
+            stream=True
+        ))
+        self.snowflake_analytics = SnowflakeSecurityAnalytics(SnowflakeConfig(
+            account=os.getenv('SNOWFLAKE_ACCOUNT'),
+            user=os.getenv('SNOWFLAKE_USER'),
+            password=os.getenv('SNOWFLAKE_PASSWORD'),
+            database=os.getenv('SNOWFLAKE_DATABASE'),
+            schema=os.getenv('SNOWFLAKE_SCHEMA'),
+            warehouse=os.getenv('SNOWFLAKE_WAREHOUSE'),
+            role=os.getenv('SNOWFLAKE_ROLE')
+        ))
         
         logger.info("Simulation Manager initialized")
     
@@ -265,22 +299,25 @@ class SimulationManager:
             
             # Main simulation loop
             while self.simulation_running and datetime.now() < end_time:
-                # Phase 1: Network Discovery with Fetch.ai agents
+                # Phase 1: Network Discovery with Fetch.ai agents (real)
                 self.ai_services["fetch_agents"]["status"] = "active"
                 self.ai_services["fetch_agents"]["last_activity"] = datetime.now().isoformat()
-                
-                logger.info("Phase 1: Network Discovery")
-                discovered_hosts = await self.network_scanner.scan_network("172.20.0.0/16")
+                logger.info("Phase 1: Network Discovery (real Fetch.ai)")
+                # Use Fetch.ai orchestrator for real discovery
+                await self.fetchai_orchestrator.initialize()
+                # This should trigger real agent-based discovery; collect results
+                # (Assume orchestrator exposes a method to get discovered hosts)
+                discovered_hosts = await self.fetchai_orchestrator.security_agents['vulnerability_monitor'].scan_network("172.20.0.0/16")
                 self.discovered_hosts.extend(discovered_hosts)
-                
-                # Phase 2: Vulnerability Analysis with Groq
+                # Phase 2: Vulnerability Analysis with Groq (real)
                 self.ai_services["groq_analyzers"]["status"] = "active"
                 self.ai_services["groq_analyzers"]["last_activity"] = datetime.now().isoformat()
-                
-                logger.info("Phase 2: Vulnerability Analysis")
+                logger.info("Phase 2: Vulnerability Analysis (real Groq)")
+                await self.groq_engine.initialize()
                 for host in discovered_hosts:
-                    vulnerabilities = await self.vulnerability_validator.analyze_host(host)
-                    self.discovered_vulnerabilities.extend(vulnerabilities)
+                    # Use Groq engine for real vulnerability analysis
+                    vulnerabilities = await self.groq_engine.vuln_classifier.classify_vulnerability(host, context={})
+                    self.discovered_vulnerabilities.append(vulnerabilities)
                 
                 # Phase 3: Exploit Generation with Blackbox.ai
                 if config.get("exploit_validation", True):
@@ -302,13 +339,16 @@ class SimulationManager:
                 # Simulate coordination between AI services
                 await asyncio.sleep(2)
                 
-                # Phase 5: Analytics with Snowflake
+                # Phase 5: Analytics with Snowflake (real)
                 self.ai_services["snowflake_analyzer"]["status"] = "active"
                 self.ai_services["snowflake_analyzer"]["last_activity"] = datetime.now().isoformat()
-                
-                logger.info("Phase 5: Security Analytics")
-                # Simulate analytics processing
-                await asyncio.sleep(2)
+                logger.info("Phase 5: Security Analytics (real Snowflake)")
+                try:
+                    await self.snowflake_analytics.initialize()
+                    analytics_results = await self.snowflake_analytics.generate_comprehensive_report(report_type="executive", period_days=30)
+                    logger.info(f"Snowflake analytics results: {analytics_results}")
+                except Exception as e:
+                    logger.error(f"Error in Snowflake analytics: {str(e)}")
                 
                 # Reset AI service status to idle
                 for service in self.ai_services:

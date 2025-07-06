@@ -15,6 +15,11 @@ import ipaddress
 import nmap
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+import dotenv
+from backend.ai-coordination.fetch_network_agents import FetchAISecurityOrchestrator
+
+# Load environment variables from .env
+dotenv.load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +43,15 @@ class NetworkScanner:
             "vulnerability_agent": {"status": "ready", "capabilities": ["vuln_detection"]}
         }
         
+        self.fetchai_orchestrator = FetchAISecurityOrchestrator({
+            'scheduler_seed': os.getenv('FETCHAI_SCHEDULER_SEED', 'cybercortex_scheduler_2025'),
+            'threat_seed': os.getenv('FETCHAI_THREAT_SEED', 'cybercortex_threat_2025'),
+            'vuln_seed': os.getenv('FETCHAI_VULN_SEED', 'cybercortex_vuln_2025'),
+            'compliance_seed': os.getenv('FETCHAI_COMPLIANCE_SEED', 'cybercortex_compliance_2025'),
+            'mailbox_key': os.getenv('FETCHAI_MAILBOX_KEY', 'cybercortex_security_mailbox'),
+            'asi_endpoint': os.getenv('FETCHAI_ASI_ENDPOINT', 'https://asi.one/api/v1')
+        })
+        
         logger.info("Network Scanner initialized")
     
     async def scan_network(self, target_network: str) -> List[Dict[str, Any]]:
@@ -50,57 +64,16 @@ class NetworkScanner:
         Returns:
             discovered_hosts: List of discovered hosts with their services
         """
-        logger.info(f"Starting network scan on {target_network}")
-        
-        # Simulate Fetch.ai agent coordination
-        await self._coordinate_fetch_agents()
-        
-        discovered_hosts = []
-        
+        logger.info(f"Starting real Fetch.ai agent network scan on {target_network}")
         try:
-            # Perform host discovery
-            logger.info("Performing host discovery")
-            self.nmap_scanner.scan(hosts=target_network, arguments='-sn')
-            
-            # Process discovered hosts
-            for host in self.nmap_scanner.all_hosts():
-                host_info = {
-                    "ip_address": host,
-                    "status": self.nmap_scanner[host].state(),
-                    "hostname": self._get_hostname(host),
-                    "last_seen": datetime.now().isoformat(),
-                    "ports": [],
-                    "services": [],
-                    "os_info": None
-                }
-                
-                # If host is up, scan for open ports and services
-                if self.nmap_scanner[host].state() == 'up':
-                    # Simulate service detection
-                    await self._detect_services(host_info)
-                    
-                    # Simulate OS detection
-                    await self._detect_os(host_info)
-                
-                discovered_hosts.append(host_info)
-                logger.info(f"Discovered host: {host}")
-            
-            # Store scan results
+            await self.fetchai_orchestrator.initialize()
+            # Use the orchestrator's vulnerability_monitor agent for scanning
+            discovered_hosts = await self.fetchai_orchestrator.security_agents['vulnerability_monitor'].scan_network(target_network)
+            logger.info(f"Fetch.ai agent scan complete. Discovered {len(discovered_hosts)} hosts.")
             self.discovered_hosts = discovered_hosts
-            self.scan_results = {
-                "scan_id": f"scan_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "target_network": target_network,
-                "timestamp": datetime.now().isoformat(),
-                "hosts_count": len(discovered_hosts),
-                "hosts": discovered_hosts
-            }
-            
-            logger.info(f"Network scan completed. Discovered {len(discovered_hosts)} hosts.")
-            
             return discovered_hosts
-            
         except Exception as e:
-            logger.error(f"Error during network scan: {str(e)}")
+            logger.error(f"Error in Fetch.ai agent network scan: {str(e)}")
             return []
     
     async def scan_host(self, host_ip: str) -> Optional[Dict[str, Any]]:

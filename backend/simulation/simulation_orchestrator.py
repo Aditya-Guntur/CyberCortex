@@ -20,6 +20,10 @@ from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import dotenv
+
+# Load environment variables from .env
+dotenv.load_dotenv()
 
 # Configure logging
 logging.basicConfig(

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, RefreshCw, ZoomIn, ZoomOut, Maximize, Download } from 'lucide-react';
 import { useSimulationState } from '@/hooks/useSimulationState';
 import { useNetworkTopology } from '@/hooks/useNetworkTopology';
+import html2canvas from 'html2canvas';
 
 interface NetworkTopologyViewProps {
   className?: string;
@@ -16,6 +17,7 @@ interface NetworkTopologyViewProps {
 export function NetworkTopologyView({ className }: NetworkTopologyViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
+  const nodesRef = useRef<DataSet<any> | null>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'default' | 'vulnerabilities' | 'services'>('default');
   
@@ -44,6 +46,7 @@ export function NetworkTopologyView({ className }: NetworkTopologyViewProps) {
       fixed: { x: true, y: true },
       data: node
     })));
+    nodesRef.current = nodes;
 
     // Create edges dataset
     const edges = new DataSet(topology.edges.map(edge => ({
@@ -52,7 +55,7 @@ export function NetworkTopologyView({ className }: NetworkTopologyViewProps) {
       to: edge.to,
       color: { color: edge.color || '#666666', highlight: '#8b5cf6' },
       width: edge.width || 1,
-      smooth: { type: 'curvedCW', roundness: 0.2 }
+      smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 }
     })));
 
     // Network options
@@ -104,13 +107,8 @@ export function NetworkTopologyView({ className }: NetworkTopologyViewProps) {
 
   // Update node colors based on view mode
   useEffect(() => {
-    if (!networkRef.current || !topology) return;
-
-    const network = networkRef.current;
-    const nodes = network.body.data.nodes;
-
-    // Update node colors based on view mode
-    nodes.update(topology.nodes.map(node => {
+    if (!nodesRef.current || !topology) return;
+    nodesRef.current.update(topology.nodes.map(node => {
       let color = node.color;
 
       if (viewMode === 'vulnerabilities') {
@@ -199,9 +197,10 @@ export function NetworkTopologyView({ className }: NetworkTopologyViewProps) {
   };
 
   // Export as image
-  const handleExport = () => {
-    if (networkRef.current) {
-      const dataUrl = networkRef.current.canvas.canvas.toDataURL('image/png');
+  const handleExport = async () => {
+    if (containerRef.current) {
+      const canvas = await html2canvas(containerRef.current);
+      const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `network-topology-${new Date().toISOString().slice(0, 10)}.png`;
       link.href = dataUrl;
