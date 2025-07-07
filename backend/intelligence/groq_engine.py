@@ -363,6 +363,9 @@ class BaseGroqAnalyzer(ABC):
                 response_time = (time.time() - start_time) * 1000
                 self.performance.record_request(response_time, True, cache_hit=False)
                 
+                # After receiving the response from Groq API, log the raw content before parsing
+                self.logger.info(f"Groq API raw response: {response.text}")
+                
                 return result
                 
         except Exception as e:
