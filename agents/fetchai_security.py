@@ -29,7 +29,7 @@ from uagents.setup import fund_agent_if_low
 from uagents.network import wait_for_tx_to_complete
 from uagents.communication import send_message
 from uagents.query import query
-from uagents.envelope import Envelope
+from uagents_core.envelope import Envelope
 
 # Additional imports for security operations
 import aiohttp
