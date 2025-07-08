@@ -451,6 +451,11 @@ async def llama_chat(request: Request):
             response.raise_for_status()
             data = response.json()
             reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from Llama."
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 503:
+            reply = "Llama is temporarily unavailable. Please try again in a few minutes."
+        else:
+            reply = f"Llama backend error: {str(e)}"
     except Exception as e:
         reply = f"Llama backend error: {str(e)}"
 
