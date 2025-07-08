@@ -36,10 +36,11 @@ logger = logging.getLogger("SimulationOrchestrator")
 app = FastAPI(title="CyberCortex Simulation Orchestrator")
 
 # CORS middleware
+frontend_url = os.environ.get("NEXT_PUBLIC_FRONTEND_URL", "https://cyber-cortex-rosy.vercel.app")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://cyber-cortex-rosy.vercel.app",  # Vercel production frontend
+        frontend_url,  # Vercel production frontend from env or default
         "http://localhost:3000"            # Local development
     ],
     allow_credentials=True,
