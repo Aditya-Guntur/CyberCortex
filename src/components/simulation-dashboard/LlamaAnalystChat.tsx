@@ -21,6 +21,7 @@ export function LlamaAnalystChat({ exploitCode, simulationContext }: LlamaAnalys
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastUserMsg, setLastUserMsg] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom on new message
@@ -53,9 +54,10 @@ export function LlamaAnalystChat({ exploitCode, simulationContext }: LlamaAnalys
       icon: <Image className="w-4 h-4 mr-1" />,
       onClick: () => {
         if (image) {
+          setWarning(null);
           sendMessage('What is in this image?', image);
         } else {
-          sendMessage('Please upload an image or log file to analyze.');
+          setWarning('Please upload an image or log file to analyze.');
         }
       }
     },
@@ -178,6 +180,7 @@ export function LlamaAnalystChat({ exploitCode, simulationContext }: LlamaAnalys
           Send
         </button>
       </div>
+      {warning && <div className="text-xs text-red-500 mt-1">{warning}</div>}
     </div>
   );
 } 
