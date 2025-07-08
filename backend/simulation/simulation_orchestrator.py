@@ -17,7 +17,7 @@ import networkx as nx
 import math
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import dotenv
@@ -411,6 +411,12 @@ async def inject_vulnerability(injection: VulnerabilityInjection):
         "service": injection.service_name,
         "vulnerability_type": injection.vulnerability_type
     }
+
+@app.post("/api/llama-chat")
+async def llama_chat(request: Request):
+    data = await request.json()
+    # For now, just echo a dummy response
+    return {"reply": "This is a test response from Llama."}
 
 # Simulation runner
 async def run_simulation(config: SimulationConfig):
