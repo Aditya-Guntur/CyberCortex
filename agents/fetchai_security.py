@@ -318,11 +318,12 @@ class SecuritySchedulerAgent:
     """Autonomous security assessment scheduler based on risk factors"""
     
     def __init__(self, name: str, seed: str, mailbox_key: str):
+        api_url = os.environ.get("NEXT_PUBLIC_API_URL", "http://127.0.0.1:10000")
         self.agent = Agent(
             name=name,
             seed=seed,
             mailbox=f"{mailbox_key}/{name}",
-            endpoint=["http://127.0.0.1:8000/submit"]
+            endpoint=[f"{api_url}/submit"]
         )
         
         self.risk_calculator = RiskCalculator()
@@ -603,11 +604,12 @@ class ThreatDiscoveryAgent:
     """Autonomous threat intelligence gathering agent"""
     
     def __init__(self, name: str, seed: str, mailbox_key: str):
+        api_url = os.environ.get("NEXT_PUBLIC_API_URL", "http://127.0.0.1:10000")
         self.agent = Agent(
             name=name,
             seed=seed,
             mailbox=f"{mailbox_key}/{name}",
-            endpoint=["http://127.0.0.1:8000/submit"]
+            endpoint=[f"{api_url}/submit"]
         )
         
         self.threat_feeds: List[str] = [
@@ -791,11 +793,12 @@ class VulnerabilityMonitorAgent:
     """Continuous vulnerability monitoring agent"""
     
     def __init__(self, name: str, seed: str, mailbox_key: str):
+        api_url = os.environ.get("NEXT_PUBLIC_API_URL", "http://127.0.0.1:10000")
         self.agent = Agent(
             name=name,
             seed=seed,
             mailbox=f"{mailbox_key}/{name}",
-            endpoint=["http://127.0.0.1:8000/submit"]
+            endpoint=[f"{api_url}/submit"]
         )
         
         self.monitored_systems: Dict[str, Dict[str, Any]] = {}
@@ -988,11 +991,12 @@ class ComplianceMonitorAgent:
     """Automated compliance checking agent"""
     
     def __init__(self, name: str, seed: str, mailbox_key: str):
+        api_url = os.environ.get("NEXT_PUBLIC_API_URL", "http://127.0.0.1:10000")
         self.agent = Agent(
             name=name,
             seed=seed,
             mailbox=f"{mailbox_key}/{name}",
-            endpoint=["http://127.0.0.1:8000/submit"]
+            endpoint=[f"{api_url}/submit"]
         )
         
         self.compliance_frameworks = ['SOC2', 'ISO27001', 'NIST', 'GDPR', 'HIPAA']

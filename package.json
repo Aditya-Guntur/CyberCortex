@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "backend:dev": "cd backend && uvicorn simulation.simulation_orchestrator:app --reload --host 0.0.0.0 --port 8000",
+    "backend:dev": "cd backend && uvicorn simulation.simulation_orchestrator:app --reload --host 0.0.0.0 --port 10000",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "agents:start": "cd agents && python main.py",

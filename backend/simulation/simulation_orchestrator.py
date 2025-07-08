@@ -17,10 +17,11 @@ import networkx as nx
 import math
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import dotenv
+import httpx
 
 # Load environment variables from .env
 dotenv.load_dotenv()
@@ -36,9 +37,13 @@ logger = logging.getLogger("SimulationOrchestrator")
 app = FastAPI(title="CyberCortex Simulation Orchestrator")
 
 # CORS middleware
+frontend_url = os.environ.get("NEXT_PUBLIC_FRONTEND_URL", "https://cyber-cortex-rosy.vercel.app")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your frontend domain
+    allow_origins=[
+        frontend_url,  # Vercel production frontend from env or default
+        "http://localhost:3000"            # Local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -407,6 +412,107 @@ async def inject_vulnerability(injection: VulnerabilityInjection):
         "service": injection.service_name,
         "vulnerability_type": injection.vulnerability_type
     }
+
+@app.post("/api/llama-chat")
+async def llama_chat(request: Request):
+    data = await request.json()
+    messages = data.get("messages", [])
+    # Format messages as in the Next.js API
+    formatted_messages = []
+    for m in messages:
+        if m.get("imageUrl"):
+            formatted_messages.append({
+                "role": m["role"],
+                "content": [
+                    {"type": "text", "text": m["content"]},
+                    {"type": "image_url", "image_url": {"url": m["imageUrl"]}}
+                ]
+            })
+        else:
+            formatted_messages.append({"role": m["role"], "content": m["content"]})
+
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return {"reply": "OpenRouter API key not set on backend."}
+
+    referer = os.environ.get("OPENROUTER_REFERER")
+    site_title = os.environ.get("OPENROUTER_SITE_TITLE")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    if referer:
+        headers["HTTP-Referer"] = referer
+    if site_title:
+        headers["X-Title"] = site_title
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={
+                    "model": "meta-llama/llama-4-maverick:free",
+                    "messages": formatted_messages
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from Llama."
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 503:
+            # Fallback to llama-4-scout:free
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": "meta-llama/llama-4-scout:free",
+                            "messages": formatted_messages
+                        }
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from first fallback Llama model."
+            except Exception:
+                # Fallback to llama-3.3-70b-instruct:free
+                try:
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        response = await client.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json={
+                                "model": "meta-llama/llama-3.3-70b-instruct:free",
+                                "messages": formatted_messages
+                            }
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                        reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from second fallback Llama model."
+                except Exception:
+                    # Fallback to llama-3.2-11b-vision-instruct:free
+                    try:
+                        async with httpx.AsyncClient(timeout=30) as client:
+                            response = await client.post(
+                                "https://openrouter.ai/api/v1/chat/completions",
+                                headers=headers,
+                                json={
+                                    "model": "meta-llama/llama-3.2-11b-vision-instruct:free",
+                                    "messages": formatted_messages
+                                }
+                            )
+                            response.raise_for_status()
+                            data = response.json()
+                            reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from third fallback Llama model."
+                    except Exception:
+                        reply = "Llama is temporarily unavailable. Please try again in a few minutes."
+        else:
+            reply = f"Llama backend error: {str(e)}"
+    except Exception as e:
+        reply = f"Llama backend error: {str(e)}"
+
+    return {"reply": reply}
 
 # Simulation runner
 async def run_simulation(config: SimulationConfig):
@@ -832,4 +938,6 @@ except Exception as e:
 # Run the application
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

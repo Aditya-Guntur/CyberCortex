@@ -15,7 +15,7 @@ interface UseWebSocketOptions {
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
-    url = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws',
+    url = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:10000/ws',
     reconnectInterval = 5000,
     maxReconnectAttempts = 10,
     onConnect,

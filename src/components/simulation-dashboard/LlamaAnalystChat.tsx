@@ -70,14 +70,15 @@ export function LlamaAnalystChat({ exploitCode, simulationContext }: LlamaAnalys
 
   async function sendMessage(text: string, imageUrl?: string, regenerate?: boolean) {
     setLoading(true);
-    const userMsg = { role: 'user', content: text, imageUrl };
+    const userMsg: Message = { role: 'user', content: text, imageUrl };
     const newMessages = regenerate
       ? messages.slice(0, -1).concat(userMsg)
       : [...messages, userMsg];
     setMessages(newMessages);
     setLastUserMsg(text);
     // Call your backend API route for Llama chat
-    const res = await fetch('/api/llama-chat', {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const res = await fetch(`${apiUrl}/api/llama-chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: newMessages, simulationContext })

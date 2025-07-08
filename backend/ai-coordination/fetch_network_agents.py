@@ -52,36 +52,39 @@ class CoordinationMessage(Model):
     content: Dict[str, Any]
     timestamp: str
 
+api_url = os.environ.get("NEXT_PUBLIC_API_URL", "http://127.0.0.1:10000")
+port = int(os.environ.get("PORT", 10000))
+
 # Network Scanner Agent
 network_scanner = Agent(
     name="network_scanner",
     seed="network_scanner_seed_phrase",
-    port=8001,
-    endpoint=["http://127.0.0.1:8001/submit"],
+    port=port,
+    endpoint=[f"{api_url}/submit"],
 )
 
 # Service Discovery Agent
 service_discovery = Agent(
     name="service_discovery",
     seed="service_discovery_seed_phrase",
-    port=8002,
-    endpoint=["http://127.0.0.1:8002/submit"],
+    port=port,
+    endpoint=[f"{api_url}/submit"],
 )
 
 # Vulnerability Scanner Agent
 vulnerability_scanner = Agent(
     name="vulnerability_scanner",
     seed="vulnerability_scanner_seed_phrase",
-    port=8003,
-    endpoint=["http://127.0.0.1:8003/submit"],
+    port=port,
+    endpoint=[f"{api_url}/submit"],
 )
 
 # Coordinator Agent
 coordinator = Agent(
     name="coordinator",
     seed="coordinator_seed_phrase",
-    port=8000,
-    endpoint=["http://127.0.0.1:8000/submit"],
+    port=port,
+    endpoint=[f"{api_url}/submit"],
 )
 
 # Network Scanner Protocol

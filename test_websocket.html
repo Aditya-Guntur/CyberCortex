@@ -19,7 +19,8 @@
         }
         
         try {
-            const ws = new WebSocket('ws://localhost:8000/ws');
+            const wsUrl = window.NEXT_PUBLIC_WS_URL || 'ws://localhost:10000/ws';
+            const ws = new WebSocket(wsUrl);
             
             ws.onopen = function() {
                 statusDiv.textContent = 'Connected!';
