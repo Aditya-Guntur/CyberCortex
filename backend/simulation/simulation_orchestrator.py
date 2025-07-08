@@ -21,6 +21,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Back
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import dotenv
+import httpx
 
 # Load environment variables from .env
 dotenv.load_dotenv()
@@ -415,8 +416,45 @@ async def inject_vulnerability(injection: VulnerabilityInjection):
 @app.post("/api/llama-chat")
 async def llama_chat(request: Request):
     data = await request.json()
-    # For now, just echo a dummy response
-    return {"reply": "This is a test response from Llama."}
+    messages = data.get("messages", [])
+    # Format messages as in the Next.js API
+    formatted_messages = []
+    for m in messages:
+        if m.get("imageUrl"):
+            formatted_messages.append({
+                "role": m["role"],
+                "content": [
+                    {"type": "text", "text": m["content"]},
+                    {"type": "image_url", "image_url": {"url": m["imageUrl"]}}
+                ]
+            })
+        else:
+            formatted_messages.append({"role": m["role"], "content": m["content"]})
+
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return {"reply": "OpenRouter API key not set on backend."}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "meta-llama/llama-4-maverick:free",
+                    "messages": formatted_messages
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from Llama."
+    except Exception as e:
+        reply = f"Llama backend error: {str(e)}"
+
+    return {"reply": reply}
 
 # Simulation runner
 async def run_simulation(config: SimulationConfig):
