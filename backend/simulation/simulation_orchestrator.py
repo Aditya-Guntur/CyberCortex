@@ -23,7 +23,7 @@ from pydantic import BaseModel
 import dotenv
 from agents.fetchai_security import FetchAISecurityOrchestrator
 from backend.intelligence.groq_engine import GroqSecurityEngine, GroqConfiguration
-from analytics.snowflake_integration import SnowflakeSecurityAnalytics, SnowflakeConfig
+#import from analytics.snowflake_integration import SnowflakeSecurityAnalytics, SnowflakeConfig  # TODO: Re-enable when Snowflake install works
 from simulation.simulation_controller.exploit_executor import ExploitExecutor
 import traceback
 
@@ -103,16 +103,28 @@ groq_engine = GroqSecurityEngine(GroqConfiguration(
     timeout=int(os.getenv('GROQ_TIMEOUT', 10)),
     stream=True
 ))
-snowflake_analytics = SnowflakeSecurityAnalytics(SnowflakeConfig(
-    account=os.getenv('SNOWFLAKE_ACCOUNT'),
-    user=os.getenv('SNOWFLAKE_USER'),
-    password=os.getenv('SNOWFLAKE_PASSWORD'),
-    database=os.getenv('SNOWFLAKE_DATABASE'),
-    schema=os.getenv('SNOWFLAKE_SCHEMA'),
-    warehouse=os.getenv('SNOWFLAKE_WAREHOUSE'),
-    role=os.getenv('SNOWFLAKE_ROLE')
-))
+#snowflake_analytics = SnowflakeSecurityAnalytics(SnowflakeConfig(
+#    account=os.getenv('SNOWFLAKE_ACCOUNT'),
+#    user=os.getenv('SNOWFLAKE_USER'),
+#    password=os.getenv('SNOWFLAKE_PASSWORD'),
+#    database=os.getenv('SNOWFLAKE_DATABASE'),
+#    schema=os.getenv('SNOWFLAKE_SCHEMA'),
+#    warehouse=os.getenv('SNOWFLAKE_WAREHOUSE'),
+#    role=os.getenv('SNOWFLAKE_ROLE')
+#))
 exploit_executor = ExploitExecutor()
+
+# Add helper function after imports
+def to_dict_if_possible(obj):
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    elif hasattr(obj, "__dict__"):
+        return dict(obj.__dict__)
+    return obj
+
+# Add this helper function near the top of the file, after imports
+def should_stop():
+    return not simulation_state.get("running", True)
 
 # Startup event
 @app.on_event("startup")
@@ -437,6 +449,11 @@ async def run_simulation(config: SimulationConfig):
         await broadcast_update("phase_change", {"phase": "initializing"})
         await broadcast_update("simulation_state", simulation_state)
         await asyncio.sleep(3)
+        if should_stop():
+            logger.info("Simulation stopped by user request (after initializing phase).")
+            simulation_state["current_phase"] = "stopped"
+            await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+            return
         
         # Phase 2: Network Discovery with Fetch.ai agents
         simulation_state["current_phase"] = "network_discovery"
@@ -498,7 +515,17 @@ async def run_simulation(config: SimulationConfig):
         for host in discovered_hosts:
             await broadcast_update("host_discovered", host)
             await asyncio.sleep(1)
+            if should_stop():
+                logger.info("Simulation stopped by user request (during host discovery loop).")
+                simulation_state["current_phase"] = "stopped"
+                await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+                return
         await broadcast_update("simulation_state", simulation_state)
+        if should_stop():
+            logger.info("Simulation stopped by user request (after network discovery phase).")
+            simulation_state["current_phase"] = "stopped"
+            await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+            return
         
         # Phase 3: Vulnerability Analysis with Groq
         simulation_state["current_phase"] = "vulnerability_analysis"
@@ -514,9 +541,9 @@ async def run_simulation(config: SimulationConfig):
                 try:
                     vulns = await groq_engine.vuln_classifier.classify_vulnerability(host, context={})
                     if isinstance(vulns, list):
-                        discovered_vulnerabilities.extend(vulns)
+                        discovered_vulnerabilities.extend([to_dict_if_possible(v) for v in vulns])
                     elif vulns:
-                        discovered_vulnerabilities.append(vulns)
+                        discovered_vulnerabilities.append(to_dict_if_possible(vulns))
                 except Exception as ve:
                     logger.warning(f"[MOCK FALLBACK] Groq API failed for host {host.get('ip_address')}: {ve}\n{traceback.format_exc()}")
         except Exception as e:
@@ -611,9 +638,26 @@ async def run_simulation(config: SimulationConfig):
         for vuln in discovered_vulnerabilities:
             await broadcast_update("vulnerability_discovered", vuln)
             await asyncio.sleep(1)
+            if should_stop():
+                logger.info("Simulation stopped by user request (during vulnerability discovery loop).")
+                simulation_state["current_phase"] = "stopped"
+                await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+                return
         await broadcast_update("simulation_state", simulation_state)
+        if should_stop():
+            logger.info("Simulation stopped by user request (after vulnerability analysis phase).")
+            simulation_state["current_phase"] = "stopped"
+            await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+            return
         
         # Phase 4: Exploit Generation with Blackbox Generator
+        if not discovered_vulnerabilities:
+            logger.warning("No valid vulnerabilities found, skipping exploit generation phase.")
+            simulation_state["executed_exploits"] = []
+            simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
+            await broadcast_update("simulation_state", simulation_state)
+            # Optionally, broadcast a phase change or skip to next phase
+            return
         simulation_state["current_phase"] = "exploit_generation"
         simulation_state["ai_services"]["blackbox_generator"]["status"] = "active"
         simulation_state["ai_services"]["blackbox_generator"]["last_activity"] = datetime.now().isoformat()
@@ -621,6 +665,10 @@ async def run_simulation(config: SimulationConfig):
         await broadcast_update("simulation_state", simulation_state)
         executed_exploits = []
         for vuln in discovered_vulnerabilities:
+            # Defensive check for malformed vulnerabilities
+            if not vuln or not isinstance(vuln, dict) or not all(k in vuln for k in ("id", "type", "host", "port", "service")):
+                logger.warning(f"Skipping malformed vulnerability: {vuln}")
+                continue
             try:
                 exploit = await exploit_executor.generate_exploit(vuln)
                 if exploit:
@@ -629,33 +677,34 @@ async def run_simulation(config: SimulationConfig):
                 else:
                     raise Exception("No exploit generated")
             except Exception as e:
-                logger.warning(f"[MOCK FALLBACK] Blackbox.ai API failed for vuln {vuln.get('id')}: {e}\n{traceback.format_exc()}")
+                logger.warning(f"[MOCK FALLBACK] Blackbox.ai API failed for vuln {vuln.get('id', 'unknown')}: {e}\n{traceback.format_exc()}")
                 # Mock fallback exploit
                 exploit = {
-                    "id": f"exploit_{vuln['id']}",
-                    "vulnerability_id": vuln["id"],
-                    "type": vuln["type"],
+                    "id": f"exploit_{vuln.get('id', 'unknown')}",
+                    "vulnerability_id": vuln.get("id", "unknown"),
+                    "type": vuln.get("type", "unknown"),
                     "target": {
-                        "host": vuln["host"],
-                        "port": vuln["port"],
-                        "service": vuln["service"]
-                    },
-                    "language": "python",
-                    "generated_at": datetime.now().isoformat(),
-                    "executed": True,
-                    "execution_result": {
-                        "success": True,
-                        "output": f"[MOCK] Exploit executed successfully against {vuln['host']}",
-                        "execution_time_ms": 1500
-                    },
-                    "code": f"# [MOCK] Exploit code for {vuln['type']} on {vuln['host']}"
+                        "host": vuln.get("host", "unknown"),
+                        "port": vuln.get("port", 0),
+                        "service": vuln.get("service", "unknown")
+                    }
                 }
                 executed_exploits.append(exploit)
                 await broadcast_update("exploit_generated", exploit)
             await asyncio.sleep(1)
+            if should_stop():
+                logger.info("Simulation stopped by user request (during exploit generation loop).")
+                simulation_state["current_phase"] = "stopped"
+                await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+                return
         simulation_state["executed_exploits"] = executed_exploits
         simulation_state["ai_services"]["blackbox_generator"]["status"] = "idle"
         await broadcast_update("simulation_state", simulation_state)
+        if should_stop():
+            logger.info("Simulation stopped by user request (after exploit generation phase).")
+            simulation_state["current_phase"] = "stopped"
+            await broadcast_update("simulation_stopped", {"simulation_id": simulation_state["simulation_id"]})
+            return
         
         # Phase 5: AI Coordination with Coral Coordinator
         simulation_state["current_phase"] = "ai_coordination"
@@ -668,41 +717,29 @@ async def run_simulation(config: SimulationConfig):
         simulation_state["ai_services"]["coral_coordinator"]["last_activity"] = datetime.now().isoformat()
         await broadcast_update("simulation_state", simulation_state)
         
-        # Phase 6: Analytics with Snowflake Analyzer
+        # Phase 6: Analytics with Snowflake Analyzer (mocked for now)
         simulation_state["current_phase"] = "analytics"
         simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "active"
         simulation_state["ai_services"]["snowflake_analyzer"]["last_activity"] = datetime.now().isoformat()
         await broadcast_update("phase_change", {"phase": "analytics"})
         await broadcast_update("simulation_state", simulation_state)
-        try:
-            await snowflake_analytics.initialize()
-            analytics_results = await snowflake_analytics.generate_comprehensive_report(report_type="executive", period_days=30)
-            logger.info(f"[REAL] Snowflake analytics results: {analytics_results}")
-        except Exception as e:
-            logger.warning(f"[MOCK FALLBACK] Snowflake API failed: {e}\n{traceback.format_exc()}")
-            # Mock fallback
-            analytics_results = {
-                "simulation_id": simulation_state["simulation_id"],
-                "total_hosts": len(simulation_state["discovered_hosts"]),
-                "total_vulnerabilities": len(simulation_state["discovered_vulnerabilities"]),
-                "total_exploits": len(simulation_state["executed_exploits"]),
-                "vulnerability_breakdown": {
-                    "critical": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "critical"]),
-                    "high": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "high"]),
-                    "medium": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "medium"]),
-                    "low": len([v for v in simulation_state["discovered_vulnerabilities"] if v["severity"] == "low"])
-                },
-                "most_vulnerable_host": max(
-                    simulation_state["discovered_hosts"],
-                    key=lambda h: len([v for v in simulation_state["discovered_vulnerabilities"] if v["host"] == h["ip_address"]]),
-                    default={}
-                ).get("ip_address", "none"),
-                "most_common_vulnerability_type": max(
-                    set(v["type"] for v in simulation_state["discovered_vulnerabilities"]),
-                    key=lambda t: len([v for v in simulation_state["discovered_vulnerabilities"] if v["type"] == t]),
-                    default="none"
-                )
-            }
+        # TODO: Re-enable Snowflake analytics below when install works
+        # try:
+        #     await snowflake_analytics.initialize()
+        #     analytics_results = await snowflake_analytics.generate_comprehensive_report(report_type="executive", period_days=30)
+        #     logger.info(f"[REAL] Snowflake analytics results: {analytics_results}")
+        # except Exception as e:
+        #     logger.warning(f"[MOCK FALLBACK] Snowflake API failed: {e}\n{traceback.format_exc()}")
+        #     # Mock fallback
+        analytics_results = {
+            "simulation_id": simulation_state["simulation_id"],
+            "total_hosts": len(simulation_state["discovered_hosts"]),
+            "total_vulnerabilities": len(simulation_state["discovered_vulnerabilities"]),
+            "total_exploits": len(simulation_state["executed_exploits"]),
+            "vulnerability_breakdown": {},
+            "most_vulnerable_host": "none",
+            "most_common_vulnerability_type": "none"
+        }
         await broadcast_update("analytics_results", analytics_results)
         simulation_state["ai_services"]["snowflake_analyzer"]["status"] = "idle"
         await broadcast_update("simulation_state", simulation_state)

@@ -37,7 +37,7 @@ export function RealTimeMetrics({ className }: RealTimeMetricsProps) {
     const typeCounts: Record<string, number> = {};
     
     vulnerabilities.forEach(vuln => {
-      const type = vuln.type.replace(/_/g, ' ');
+      const type = vuln.type ? vuln.type.replace(/_/g, ' ') : 'Unknown';
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
     
