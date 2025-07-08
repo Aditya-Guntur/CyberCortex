@@ -70,7 +70,7 @@ export function LlamaAnalystChat({ exploitCode, simulationContext }: LlamaAnalys
 
   async function sendMessage(text: string, imageUrl?: string, regenerate?: boolean) {
     setLoading(true);
-    const userMsg = { role: 'user', content: text, imageUrl };
+    const userMsg: Message = { role: 'user', content: text, imageUrl };
     const newMessages = regenerate
       ? messages.slice(0, -1).concat(userMsg)
       : [...messages, userMsg];
