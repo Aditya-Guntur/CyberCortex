@@ -1,8 +1,12 @@
+"use client"
+
 import { Bell, Settings, User, Shield, Activity, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useRouter } from 'next/navigation'
 
-export function DashboardHeader() {
+export function DashboardHeader({ setTab }: { setTab?: (tab: string) => void }) {
+  const router = useRouter();
   return (
     <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -21,18 +25,12 @@ export function DashboardHeader() {
             </div>
             
             <nav className="hidden md:flex items-center space-x-6">
-              <Button variant="ghost" size="sm" className="text-cyber-500">
+              <Button variant="ghost" size="sm" className="text-cyber-500" onClick={() => setTab && setTab('overview')}>
                 <Activity className="w-4 h-4 mr-2" />
                 Dashboard
               </Button>
-              <Button variant="ghost" size="sm">
-                Scans
-              </Button>
-              <Button variant="ghost" size="sm">
-                Agents
-              </Button>
-              <Button variant="ghost" size="sm">
-                Reports
+              <Button variant="ghost" size="sm" onClick={() => router.push('/simulation')}>
+                Simulation
               </Button>
             </nav>
           </div>
@@ -52,23 +50,23 @@ export function DashboardHeader() {
             </div>
 
             {/* Notifications */}
-            <Button variant="ghost" size="sm" className="relative">
+            {/* <Button variant="ghost" size="sm" className="relative">
               <Bell className="w-4 h-4" />
               <Badge className="absolute -top-1 -right-1 w-5 h-5 text-xs bg-security-high">
                 3
               </Badge>
-            </Button>
+            </Button> */}
 
             {/* Settings */}
-            <Button variant="ghost" size="sm">
+            {/* <Button variant="ghost" size="sm">
               <Settings className="w-4 h-4" />
-            </Button>
+            </Button> */}
 
             {/* User Menu */}
-            <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+            {/* <Button variant="ghost" size="sm" className="flex items-center space-x-2" onClick={() => router.push('/simulation')}>
               <User className="w-4 h-4" />
               <span className="hidden md:inline text-sm">Admin</span>
-            </Button>
+            </Button> */}
           </div>
         </div>
       </div>
