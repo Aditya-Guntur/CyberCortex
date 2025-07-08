@@ -435,14 +435,22 @@ async def llama_chat(request: Request):
     if not api_key:
         return {"reply": "OpenRouter API key not set on backend."}
 
+    referer = os.environ.get("OPENROUTER_REFERER")
+    site_title = os.environ.get("OPENROUTER_SITE_TITLE")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    if referer:
+        headers["HTTP-Referer"] = referer
+    if site_title:
+        headers["X-Title"] = site_title
+
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                },
+                headers=headers,
                 json={
                     "model": "meta-llama/llama-4-maverick:free",
                     "messages": formatted_messages
@@ -453,7 +461,22 @@ async def llama_chat(request: Request):
             reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from Llama."
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 503:
-            reply = "Llama is temporarily unavailable. Please try again in a few minutes."
+            # Fallback to another model
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": "meta-llama/llama-3.3-70b-instruct:free",
+                            "messages": formatted_messages
+                        }
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from fallback Llama model."
+            except Exception:
+                reply = "Llama is temporarily unavailable. Please try again in a few minutes."
         else:
             reply = f"Llama backend error: {str(e)}"
     except Exception as e:
