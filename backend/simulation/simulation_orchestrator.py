@@ -38,7 +38,10 @@ app = FastAPI(title="CyberCortex Simulation Orchestrator")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your frontend domain
+    allow_origins=[
+        "https://cyber-cortex-rosy.vercel.app",  # Vercel production frontend
+        "http://localhost:3000"            # Local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -832,4 +835,6 @@ except Exception as e:
 # Run the application
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
