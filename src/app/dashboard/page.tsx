@@ -8,14 +8,16 @@ import { AssessmentManager } from '@/components/dashboard/assessment-manager'
 import { VulnerabilityTracker } from '@/components/dashboard/vulnerability-tracker'
 import { ComplianceMonitor } from '@/components/dashboard/compliance-monitor'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import React, { useState } from 'react'
 
 export default function DashboardPage() {
+  const [tab, setTab] = useState('overview')
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader />
+      <DashboardHeader setTab={setTab} />
       
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={tab} onValueChange={setTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="assessments">Assessments</TabsTrigger>
