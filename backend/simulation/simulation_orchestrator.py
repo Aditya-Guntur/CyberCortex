@@ -461,7 +461,7 @@ async def llama_chat(request: Request):
             reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from Llama."
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 503:
-            # Fallback to another model
+            # Fallback to another model: llama-3.3-70b-instruct:free
             try:
                 async with httpx.AsyncClient(timeout=30) as client:
                     response = await client.post(
@@ -476,7 +476,37 @@ async def llama_chat(request: Request):
                     data = response.json()
                     reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from fallback Llama model."
             except Exception:
-                reply = "Llama is temporarily unavailable. Please try again in a few minutes."
+                # Fallback to another model: llama-3.2-11b-vision-instruct:free
+                try:
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        response = await client.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers,
+                            json={
+                                "model": "meta-llama/llama-3.2-11b-vision-instruct:free",
+                                "messages": formatted_messages
+                            }
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                        reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from second fallback Llama model."
+                except Exception:
+                    # Fallback to another model: llama-4-scout:free
+                    try:
+                        async with httpx.AsyncClient(timeout=30) as client:
+                            response = await client.post(
+                                "https://openrouter.ai/api/v1/chat/completions",
+                                headers=headers,
+                                json={
+                                    "model": "meta-llama/llama-4-scout:free",
+                                    "messages": formatted_messages
+                                }
+                            )
+                            response.raise_for_status()
+                            data = response.json()
+                            reply = data.get("choices", [{}])[0].get("message", {}).get("content") or "No response from third fallback Llama model."
+                    except Exception:
+                        reply = "Llama is temporarily unavailable. Please try again in a few minutes."
         else:
             reply = f"Llama backend error: {str(e)}"
     except Exception as e:
