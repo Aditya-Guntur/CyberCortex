@@ -9,8 +9,8 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://backend:8000
-      - NEXT_PUBLIC_WS_URL=ws://backend:8000
+      - NEXT_PUBLIC_API_URL=http://backend:10000
+      - NEXT_PUBLIC_WS_URL=ws://backend:10000
     volumes:
       - .:/app
       - /app/node_modules
@@ -25,7 +25,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "10000:10000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
@@ -83,7 +83,7 @@ services:
       - CORAL_SERVER_URL=${CORAL_SERVER_URL}
       - FETCHAI_AGENT_ADDRESS=${FETCHAI_AGENT_ADDRESS}
       - FETCHAI_PRIVATE_KEY=${FETCHAI_PRIVATE_KEY}
-      - BACKEND_URL=http://backend:8000
+      - BACKEND_URL=http://backend:10000
     volumes:
       - ./agents:/app
     depends_on:
@@ -100,7 +100,7 @@ services:
       - "9000:9000"
     environment:
       - MCP_SERVER_PORT=9000
-      - BACKEND_URL=http://backend:8000
+      - BACKEND_URL=http://backend:10000
     volumes:
       - ./mcp:/app
     depends_on:

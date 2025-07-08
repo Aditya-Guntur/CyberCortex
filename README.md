@@ -160,8 +160,8 @@ npm run agents:start
 
 ### 5. Access the Platform
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Backend API**: http://localhost:10000
+- **API Docs**: http://localhost:10000/docs
 - **Grafana**: http://localhost:3001 (admin/admin)
 - **Prometheus**: http://localhost:9090
 
@@ -322,7 +322,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 ### Documentation
-- [API Documentation](http://localhost:8000/docs)
+- [API Documentation](http://localhost:10000/docs)
 - [Agent Development Guide](./docs/agents.md)
 - [Deployment Guide](./docs/deployment.md)
 - [Security Best Practices](./docs/security.md)
