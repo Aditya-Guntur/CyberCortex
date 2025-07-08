@@ -24,6 +24,7 @@ interface SimulationState {
   stopSimulation: () => Promise<void>;
   refreshState: () => Promise<void>;
   injectVulnerability: (service: string, vulnType: string) => Promise<void>;
+  resetSimulationState: () => void;
   
   // WebSocket handlers
   handleSimulationStarted: (data: any) => void;
@@ -248,6 +249,38 @@ export const useSimulationState = create<SimulationState>()(
         hosts: data.discovered_hosts || [],
         vulnerabilities: data.discovered_vulnerabilities || [],
         exploits: data.executed_exploits || []
+      });
+    },
+
+    // NEW: Reset simulation state to initial values
+    resetSimulationState: async () => {
+      try {
+        await fetch('/api/simulation/reset', { method: 'POST' });
+      } catch (e) {
+        // Ignore errors, still reset local state
+      }
+      set({
+        simulation: {
+          running: false,
+          simulation_id: null,
+          start_time: null,
+          current_phase: 'idle',
+          discovered_hosts: [],
+          discovered_vulnerabilities: [],
+          executed_exploits: [],
+          ai_services: {
+            fetch_agents: { status: 'idle', last_activity: null },
+            groq_analyzers: { status: 'idle', last_activity: null },
+            coral_coordinator: { status: 'idle', last_activity: null },
+            blackbox_generator: { status: 'idle', last_activity: null },
+            snowflake_analyzer: { status: 'idle', last_activity: null }
+          }
+        },
+        hosts: [],
+        vulnerabilities: [],
+        exploits: [],
+        loading: false,
+        error: null
       });
     }
   }))

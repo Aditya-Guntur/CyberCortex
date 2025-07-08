@@ -235,6 +235,28 @@ async def stop_simulation():
         "status": "stopping"
     }
 
+@app.post("/simulation/reset")
+async def reset_simulation():
+    global simulation_state
+    simulation_state = {
+        "running": False,
+        "simulation_id": None,
+        "start_time": None,
+        "current_phase": "idle",
+        "discovered_hosts": [],
+        "discovered_vulnerabilities": [],
+        "executed_exploits": [],
+        "ai_services": {
+            "fetch_agents": {"status": "idle", "last_activity": None},
+            "groq_analyzers": {"status": "idle", "last_activity": None},
+            "coral_coordinator": {"status": "idle", "last_activity": None},
+            "blackbox_generator": {"status": "idle", "last_activity": None},
+            "snowflake_analyzer": {"status": "idle", "last_activity": None}
+        }
+    }
+    await broadcast_update("simulation_state", simulation_state)
+    return {"message": "Simulation state reset"}
+
 @app.get("/simulation/results/{simulation_id}")
 async def get_simulation_results(simulation_id: str):
     # In a real implementation, this would retrieve results from a database

@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation'
 
 export default function SimulationPage() {
   const { connected } = useWebSocketConnection();
-  const { refreshState } = useSimulationState();
+  const { refreshState, resetSimulationState } = useSimulationState();
   const router = useRouter();
   
   // Setup WebSocket handlers
@@ -26,6 +26,11 @@ export default function SimulationPage() {
   useEffect(() => {
     refreshState();
   }, [refreshState]);
+
+  // Reset simulation state on mount (fresh start)
+  useEffect(() => {
+    resetSimulationState();
+  }, []);
   
   return (
     <div className="min-h-screen bg-background">
