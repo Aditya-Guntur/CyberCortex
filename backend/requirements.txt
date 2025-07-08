@@ -14,7 +14,7 @@ python-dotenv>=1.0.0
 sqlalchemy>=2.0.23
 alembic>=1.13.1
 asyncpg>=0.29.0
-redis>=5.0.1
+redis==6.2.0
 celery>=5.3.4
 
 # HTTP and networking
@@ -40,7 +40,6 @@ beautifulsoup4>=4.12.2
 lxml>=4.9.3
 
 # Security tools and networking
-nmap-python>=1.5.4
 python-nmap>=0.7.1
 scapy>=2.5.0
 cryptography>=41.0.8
@@ -70,7 +69,7 @@ langchain-openai>=0.0.2
 
 # Multi-agent systems
 uagents>=0.12.0
-coral-protocol>=0.3.2
+coral-server>=0.3.2
 mcp-server>=0.2.1
 
 # Data warehouse
