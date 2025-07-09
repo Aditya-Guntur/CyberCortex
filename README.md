@@ -170,7 +170,7 @@ npm run agents:start
 ### Required API Keys
 1. **Groq API**: Get from [console.groq.com](https://console.groq.com)
 2. **Blackbox.ai**: Contact Blackbox.ai for enterprise access
-3. **Coral Protocol**: Register at [coral-protocol.com](https://coral-protocol.com)
+3. **Coral Protocol**: Open protocol for secure, decentralized agent coordination. No API key or registration required.
 4. **Fetch.ai**: Create agent at [fetch.ai](https://fetch.ai)
 5. **Snowflake**: Set up account at [snowflake.com](https://snowflake.com)
 
